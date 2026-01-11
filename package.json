@@ -1,0 +1,57 @@
+{
+  "name": "express-unified-response",
+  "version": "1.0.0",
+  "description": "express-unified-response provides a production-ready solution for consistent API responses, centralized error handling, and smart pagination in Express applications. It includes a robust AppError system, automatic Mongoose error normalization, query and aggregate pagination helpers, DTO/transform support, REST-correct response defaults, and async handler utilities — all designed to reduce boilerplate and enforce clean API standards.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --splitting --minify --out-dir dist",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "npm run build",
+    "release:patch": "npm version patch -m 'chore(release): %s' && git push origin dev --follow-tags",
+    "release:minor": "npm version minor -m 'chore(release): %s' && git push origin dev --follow-tags",
+    "release:major": "npm version major -m 'chore(release): %s' && git push origin dev --follow-tags"
+  },
+  "keywords": [
+    "express",
+    "response",
+    "error-handler",
+    "pagination",
+    "mongoose",
+    "typescript"
+  ],
+  "author": "Sayantan Chakraborty",
+  "license": "MIT",
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0",
+    "mongoose": "^7.0.0 || ^8.0.0 || ^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.0.0",
+    "express": "^5.2.1",
+    "mongoose": "^9.1.2",
+    "supertest": "^7.2.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.52.0",
+    "vitest": "^4.0.16"
+  }
+}

@@ -1,0 +1,17 @@
+# Ignore source code (users only need the compiled /dist)
+src/
+tests/
+
+# Ignore configuration files
+tsconfig.json
+vitest.config.ts
+eslint.config.mjs
+tsup.config.ts
+.github/
+
+# Ignore documentation/meta
+.gitignore
+.npmignore
+
+# NEVER ignore the dist folder in the NPM package
+!dist/
