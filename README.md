@@ -321,6 +321,6 @@ MIT License
 - [Sayantan Chakraborty](https://github.com/SayantanCode)
 
 ## 🌟 Star this project on GitHub
-[![Star](https://img.shields.io/github/stars/sayantan-chakraborty/express-unified-response?style=social)](https://github.com/sayantan-chakraborty/express-unified-response)
+[![Star](https://img.shields.io/github/stars/sayantanCode/express-unified-response?style=social)](https://github.com/sayantanCode/express-unified-response)
 
 ## Made with ❤️ by Sayantan Chakraborty
