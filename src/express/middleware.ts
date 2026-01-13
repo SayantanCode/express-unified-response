@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ResponseBuilder } from "../core/responseBuilder";
 import { Paginator } from "../core/paginator";
 import { ResponseConfig } from "../config/types";
+import { AppError } from "../core/errors";
 // import { AppError, createAppError } from "../core/errors";
 
 export const createResponseMiddleware = (config?: ResponseConfig) => {
@@ -54,7 +55,11 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
     };
 
     res.paginated = (result: any, message?: string, transform?: any) => {
-      const { statusCode, body } = builder.paginated(result, message, transform);
+      const { statusCode, body } = builder.paginated(
+        result,
+        message,
+        transform
+      );
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);
       // }
@@ -70,7 +75,20 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
     };
 
     res.paginateQuery = async (model: any, options: any, message?: string) => {
-      const result = await paginator.paginateQuery(model, options);
+      //check options.transform must be a function
+      const transform = options?.transform;
+      if (transform && typeof transform !== "function") {
+        throw new AppError(
+          "Transform must be a function",
+          400,
+          "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+        );
+      }
+      const result = await paginator.paginateQuery(
+        model,
+        options,
+        options.transform
+      );
       const { statusCode, body } = builder.paginated(result, message);
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);

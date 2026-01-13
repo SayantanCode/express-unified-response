@@ -304,7 +304,7 @@ export class ResponseBuilder {
 
     const shouldReturnBody =
       (this.config.restDefaults.updateReturnsBody || !!message) &&
-      data !== undefined;
+      data !== undefined && data !== null && data !== '' && data !== false && data !== "_";
 
     if (shouldReturnBody) {
       if (this.shouldLog({ silent })) {

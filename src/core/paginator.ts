@@ -229,6 +229,7 @@ export interface QueryPaginationOptions<T extends Document> {
   filter?: Record<string, any>;
   projection?: any;
   populate?: string | PopulateOptions | (string | PopulateOptions)[];
+  select?: string;
   lean?: boolean;
 }
 
@@ -289,6 +290,7 @@ export class Paginator {
 
     if (options.sort) query = query.sort(options.sort);
     if (options.populate) query = query.populate(options.populate as any);
+    if (options.select) query = query.select(options.select);
     if (options.lean) query = query.lean();
 
     const [docs, totalDocs] = await Promise.all([
