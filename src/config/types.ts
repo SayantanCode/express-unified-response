@@ -51,14 +51,14 @@ export interface ResponseConfig {
   };
   restDefaults?: RestDefaults;
   logger?: {
-    onSuccess?: (statusCode: number) => void;
-    onError?: (error: AppError, statusCode: number) => void;
+    onSuccess?: (req?: any, statusCode?: number, durationMs?: number) => void;
+    onError?: (req?: any, error?: AppError, statusCode?: number, durationMs?: number) => void;
   };
+  routeNotFound?: boolean;
   silent?: boolean;
 }
 
 export interface ResolvedResponseConfig {
-  //   logger: any;
   keys: Required<ResponseKeyMapping>;
   error: Required<ErrorExposureConfig>;
   pagination: {
@@ -67,8 +67,9 @@ export interface ResolvedResponseConfig {
   };
   restDefaults: Required<RestDefaults>;
   logger?: {
-    onSuccess?: (statusCode: number) => void;
-    onError?: (error: AppError, statusCode: number) => void;
+    onSuccess?: (req?: any, statusCode?: number, durationMs?: number) => void;
+    onError?: (req?: any, error?: AppError, statusCode?: number, durationMs?: number) => void;
   };
+  routeNotFound?: boolean;
   silent?: boolean;
 }

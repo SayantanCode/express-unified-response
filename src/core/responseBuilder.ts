@@ -208,17 +208,17 @@ export class ResponseBuilder {
     return data as T | R | R[];
   }
 
-  private baseSuccess<T, R>(
+  private baseSuccess<T>(
     data: T,
-    message?: string,
-    transform?: TransformFn<T, R>
+    message?: string
+    // transform?: TransformFn<T, R>
   ) {
     const { successKey, dataKey, messageKey } = this.config.keys;
-    const finalData = this.applyTransform(data, transform);
+    // const finalData = this.applyTransform(data, transform);
 
     return {
       [successKey]: true,
-      [dataKey]: finalData,
+      ...(data !== undefined ? { [dataKey]: data } : {}),
       ...(message ? { [messageKey]: message } : {}),
     } as Record<string, any>;
   }
@@ -231,27 +231,45 @@ export class ResponseBuilder {
   // ---------- Public success APIs ----------
 
   /**
-   * Non‑paginated list response with transformation support.
+   * List response designed to work with Paginator.paginateList results.
+   * Handles the metadata block and transformation.
    */
   list<T, R = T>(
-    items: T[],
+    result: PaginatedResult<T>, // Changed from T[] to PaginatedResult
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean }
-  ): Record<string, any> {
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(200);
-    }
-    const { successKey, dataKey, messageKey } = this.config.keys;
-    const finalData = this.applyTransform(items, transform);
+
+    const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
+    const labels = this.config.pagination.labels || {};
+
+    // 1. Transform the data within the result object
+    const finalDocs = this.applyTransform(result.docs, transform);
+
+    // 2. Map the metadata using your configured labels
+    const meta = {
+      [labels.totalDocs ?? "totalDocs"]: result.totalDocs,
+      [labels.limit ?? "limit"]: result.limit,
+      [labels.page ?? "page"]: result.page,
+      [labels.totalPages ?? "totalPages"]: result.totalPages,
+      [labels.hasNextPage ?? "hasNextPage"]: result.hasNextPage,
+      [labels.hasPrevPage ?? "hasPrevPage"]: result.hasPrevPage,
+      [labels.nextPage ?? "nextPage"]: result.nextPage,
+      [labels.prevPage ?? "prevPage"]: result.prevPage,
+    };
 
     return {
-      [successKey]: true,
-      [dataKey]: finalData,
-      ...(message ? { [messageKey]: message } : {}),
+      statusCode: 200,
+      body: {
+        [successKey]: true,
+        [dataKey]: finalDocs,
+        [metaKey]: meta, // Added meta block for consistency
+        ...(message ? { [messageKey]: message } : {}),
+      },
+      shouldLog: this.shouldLog({ silent }),
     };
   }
-
   /**
    * Generic success (200) with transformation support.
    */
@@ -259,14 +277,19 @@ export class ResponseBuilder {
     data: T,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean }
-  ): { statusCode: number; body: Record<string, any> } {
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(200);
+    let processedData = data;
+    if (typeof data === "object" && data !== null && "_doc" in (data as any)) {
+      processedData = (data as any)._doc;
     }
+
+    const finalData = this.applyTransform(processedData, transform);
+
     return {
       statusCode: 200,
-      body: this.baseSuccess(data, message, transform),
+      body: this.baseSuccess(finalData, message),
+      shouldLog: this.shouldLog({ silent }),
     };
   }
 
@@ -277,78 +300,99 @@ export class ResponseBuilder {
     data: T,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean }
-  ): { statusCode: number; body: Record<string, any> } {
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(201);
-    }
+    const finalData = this.applyTransform(data, transform);
+
     return {
       statusCode: 201,
-      body: this.baseSuccess(data, message, transform),
+      body: this.baseSuccess(finalData, message),
+      shouldLog: this.shouldLog({ silent }),
     };
   }
 
   /**
    * Updated resource logic:
-   * - If a message is provided, return 200 + body (204 cannot have a body).
    * - If updateReturnsBody = true -> 200 + body.
-   * - Else -> 204 No Content (body is strictly undefined).
+   * - Else -> 204 No Content
+   * - Overrides 204 to 200 if message/data is provided.
    */
   updated<T, R = T>(
     data?: T,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean }
-  ): { statusCode: number; body?: Record<string, any> } {
-    // Force 200 if there is a message, as 204 cannot carry a message body
+  ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
 
-    const shouldReturnBody =
-      (this.config.restDefaults.updateReturnsBody || !!message) &&
-      data !== undefined && data !== null && data !== '' && data !== false && data !== "_";
+    const isEmpty = (val: any) =>
+      val === undefined ||
+      val === null ||
+      val === "" ||
+      val === false ||
+      val === "_";
 
-    if (shouldReturnBody) {
-      if (this.shouldLog({ silent })) {
-        this.config.logger?.onSuccess?.(200);
-      }
+    // Scenario A: User wants a 200 response (Either they have data OR a message)
+    const hasData = !isEmpty(data);
+    const hasMessage = !!message;
+
+    if (hasData || hasMessage) {
+      const finalData = hasData
+        ? this.applyTransform(data!, transform)
+        : undefined;
+
       return {
         statusCode: 200,
-        body: this.baseSuccess(data, message, transform),
+        body: this.baseSuccess(finalData, message), // baseSuccess handles undefined data by the dataKey
+        shouldLog: this.shouldLog({ silent }),
       };
     }
 
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(204);
-    }
-    return { statusCode: 204, body: undefined };
+    // Scenario B: No data and No message -> 204 No Content
+    return {
+      statusCode: 204,
+      body: undefined,
+      shouldLog: this.shouldLog({ silent }),
+    };
   }
 
   /**
    * Deleted resource.
    * - If deleteReturnsNoContent = true -> 204 No Content.
    * - Else -> 200 + { success, message? }.
+   * - Overrides 204 to 200 if message/data is provided.
    */
-  deleted(message?: string, options?: { silent?: boolean }): {
-    statusCode: number;
-    body?: Record<string, any>;
-  } {
+  deleted(
+    data?: any,
+    message?: string,
+    options?: { silent?: boolean }
+  ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
     const { silent } = options || {};
-    if (this.config.restDefaults.deleteReturnsNoContent && !message) {
-      if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(204);
-    }
-      return { statusCode: 204, body: undefined };
+
+    const isEmpty = (val: any) =>
+      val === undefined ||
+      val === null ||
+      val === "" ||
+      val === false ||
+      val === "_";
+
+    const hasData = !isEmpty(data);
+    const hasMessage = !!message;
+
+    // If global config says 204 but we have a message, we MUST override to 200
+    if (hasMessage || hasData) {
+      return {
+        statusCode: 200,
+        body: this.baseSuccess(hasData ? data : undefined, message),
+        shouldLog: this.shouldLog({ silent }),
+      };
     }
 
-    const { successKey, messageKey } = this.config.keys;
-    const body = {
-      [successKey]: true,
-      ...(message ? { [messageKey]: message } : {}),
+    // Default to 204 for deletions if no message/data provided
+    return {
+      statusCode: 204,
+      body: undefined,
+      shouldLog: this.shouldLog({ silent }),
     };
-
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(200);
-    }
-    return { statusCode: 200, body };
   }
 
   /**
@@ -358,11 +402,11 @@ export class ResponseBuilder {
     result: PaginatedResult<T>,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean }
-  ): { statusCode: number; body: Record<string, any> } {
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onSuccess?.(200);
-    }
+    // if (this.shouldLog({ silent })) {
+    //   this.config.logger?.onSuccess?.(200);
+    // }
 
     const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
     const labels = this.config.pagination.labels || {};
@@ -386,13 +430,16 @@ export class ResponseBuilder {
       ...(message ? { [messageKey]: message } : {}),
     };
 
-    return { statusCode: 200, body };
+    return { statusCode: 200, body, shouldLog: this.shouldLog({ silent }) };
   }
 
   /**
    * Error response remains the same but returns Record<string, any> for consistency.
    */
-  error(err: unknown, options?: { silent?: boolean }): { statusCode: number; body: Record<string, any> } {
+  apperror(
+    err: unknown,
+    options?: { silent?: boolean }
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { silent } = options || {};
     const appErr: AppError = createAppError(err);
     const { keys, error } = this.config;
@@ -410,10 +457,14 @@ export class ResponseBuilder {
     if (error.exposeErrorName && appErr.name) body[errorKey].name = appErr.name;
     if (error.exposeStack && appErr.stack) body[errorKey].stack = appErr.stack;
 
-    if (this.shouldLog({ silent })) {
-      this.config.logger?.onError?.(appErr, appErr.statusCode);
-    }
+    // if (this.shouldLog({ silent })) {
+    //   this.config.logger?.onError?.(appErr);
+    // }
 
-    return { statusCode: appErr.statusCode, body };
+    return {
+      statusCode: appErr.statusCode,
+      body,
+      shouldLog: this.shouldLog({ silent }),
+    };
   }
 }

@@ -18,7 +18,7 @@ const defaultKeys: Required<ResponseKeyMapping> = {
 };
 
 const defaultError: Required<ErrorExposureConfig> = {
-  exposeStack: false,
+  exposeStack: true,
   exposeErrorName: false,
   defaultErrorMessage: "Internal server error",
 };
@@ -62,6 +62,13 @@ export function resolveConfig(config?: ResponseConfig): ResolvedResponseConfig {
       ...defaultRestDefaults,
       ...(config?.restDefaults || {}),
     },
-    logger: config?.logger,
+    logger: config?.logger
+      ? {
+          onSuccess: (req?: any, statusCode?: number, durationMs?: number) =>
+            config.logger?.onSuccess?.(req, statusCode as number, durationMs),
+          onError: (req?: any, error?: any, statusCode?: number, durationMs?: number) =>
+            config.logger?.onError?.(req, error, statusCode as number, durationMs),
+        }
+      : undefined,
   };
 }

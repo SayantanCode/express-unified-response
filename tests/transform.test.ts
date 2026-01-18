@@ -12,13 +12,13 @@ describe("Data Transformation (DTO)", () => {
 
   it("should transform a single object", async () => {
     app.get("/single", (req, res) => {
-      res.success({ _id: 1, password: "xxx", name: "Joe" }, "User", {
-        transform: (doc) => ({ id: doc._id, name: doc.name }),
+      res.success({ id: 1, password: "xxx", name: "Joe", _age: 30 }, "User", {
+        transform: (doc) => ({ id: doc.id, name: doc.name, age: doc._age }),
       });
     });
 
     const res = await request(app).get("/single");
-    expect(res.body.data).toEqual({ id: 1, name: "Joe" });
+    expect(res.body.data).toEqual({ id: 1, name: "Joe", age: 30 });
     expect(res.body.data.password).toBeUndefined();
   });
 
@@ -28,12 +28,14 @@ describe("Data Transformation (DTO)", () => {
         { _id: 1, name: "Joe" },
         { _id: 2, name: "Jane" },
       ];
-      res.list(users, "Users", {
-        transform: (doc: any) => ({
-          id: doc._id,
-          name: doc.name.toUpperCase(),
-        }),
-      });
+      res.list(
+        users,
+        {
+          paginate: false,
+          transform: (doc) => ({ id: doc._id, name: doc.name.toUpperCase() }),
+        },
+        "Users"
+      );
     });
 
     const res = await request(app).get("/list");
@@ -52,11 +54,11 @@ describe("Data Transformation (DTO)", () => {
       }),
     };
 
-    const result = await paginator.paginateAggregate(
-      mockModel,
-      { page: 1, limit: 10 },
-      (doc: any) => ({ id: doc._id, doubleVal: doc.val * 2 })
-    );
+    const result = await paginator.paginateAggregate(mockModel, {
+      page: 1,
+      limit: 10,
+      transform: (doc: any) => ({ id: doc._id, doubleVal: doc.val * 2 }),
+    });
 
     expect(result.docs[0]).toEqual({ id: "123", doubleVal: 20 });
     expect(result.docs[1].doubleVal).toBe(40);
