@@ -1,53 +1,59 @@
 # express-unified-response
 
-[![npm version](https://img.shields.io/npm/v/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
+<!-- [![npm version](https://img.shields.io/npm/v/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
 [![npm downloads](https://img.shields.io/npm/dm/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
 [![license](https://img.shields.io/npm/l/express-unified-response)](LICENSE)
-[![node](https://img.shields.io/node/v/express-unified-response)](https://nodejs.org)
+[![node](https://img.shields.io/node/v/express-unified-response)](https://nodejs.org) -->
+
 ![express](https://img.shields.io/badge/express-middleware-black)
 ![typescript](https://img.shields.io/badge/typescript-supported-blue)
 
 # 🚀 Express Smart Response & Error Toolkit
+
 A production-ready response, error handling, and pagination toolkit for Express + Mongoose APIs.
 It enforces consistent API responses, centralized error handling, and powerful pagination with minimal boilerplate.
-
 
 ## ✨ FEATURES
 
 ### ✅ Unified API Responses Unified API responses
+
 - Standard success, created, updated, deleted responses
 - Configurable response keys (success, data, meta, message, error)
 - Built-in REST semantics (204 No Content, 201 Created, etc.)
 
 ### ❌ Centralized error handling
+
 - Custom AppError hierarchy
 - Automatic conversion of:
-    - Mongoose validation errors
-    - Mongoose cast errors
-    - Mongoose duplicate key errors
-    - JWT errors
-    - File upload errors
-    - Axios / external service errors
+  - Mongoose validation errors
+  - Mongoose cast errors
+  - Mongoose duplicate key errors
+  - JWT errors
+  - File upload errors
+  - Axios / external service errors
 - Safe defaults for production (no stack leaks)
 
 ### 📄 Pagination (Query + Aggregate)
+
 - Paginate standard Mongoose queries
 - Paginate aggregation pipelines
 - Supports transform (DTO) functions
 - Enforces max limits automatically
 
 ### 🧠 Smart Middleware Extensions
+
 - Adds helper methods directly to res:
-    - `res.success()`
-    - `res.created()`
-    - `res.updated()`
-    - `res.deleted()`
-    - `res.list()`
-    - `res.paginated()`
-    - `res.paginateQuery()`
-    - `res.paginateAggregate()`
-    - `res.error()`
+  - `res.success()`
+  - `res.created()`
+  - `res.updated()`
+  - `res.deleted()`
+  - `res.list()`
+  - `res.paginateQuery()`
+  - `res.paginateAggregate()`
+  - `res.apperror()`
+
 ### ⚙️ Fully configurable
+
 - Rename response keys
 - Customize pagination labels
 - Control REST defaults
@@ -92,102 +98,106 @@ export default app;
 
 ## 🟢 USING RESPONSE HELPERS
 
-### Success Response
+The library follows 2 consistent pattern 1 for non paginated non array responses and 2 for paginated responses.
+like this:
+(1. (Data, Message, Options) or (Data, Message) or (Data) )
+
+(2. (Data, Options, Message) or (Data, Options) )
+
+### Success & Created
 
 ```js
+// Simple usage
 res.success(user, "User fetched successfully");
+
+// With Transform (DTO) and Silent Logging
+res.success(user, "OK", {
+  transform: (u) => ({ id: u._id, name: u.name }),
+  silent: true,
+});
+
+res.created(newUser, "User created");
 ```
 
-```js
-{
-  "success": true,
-  "data": { ... },
-  "message": "User fetched successfully"
-}
-```
+### Updated & Deleted
 
-### Created (201)
+The toolkit handles REST semantics automatically. If data is provided, it returns `200`. If data is null/empty, it returns `204`.
 
 ```js
-res.created(user, "User created");
-```
-
-### Updated
-
-```js
+// Returns 200 + Body
 res.updated(updatedUser, "User updated");
+
+// Returns 204 No Content (No body)
+res.updated(null);
+
+// Message-only: Returns 200 + Message (Skips data when 1st arg is null/undefined/`_`)
+res.updated(null, "Password changed successfully");
+
+res.deleted(null, "User deleted");
 ```
 
-Returns
+### List (Paginated or Non Paginated)
 
-- 200 + body (default)
-- or 204 No Content based on config
-
-### Deleted
+Useful for sending arrays of data while still supporting pagination.
 
 ```js
-res.deleted(user, "User deleted");
-```
-
-### List (Non Paginated)
-
-```js
-res.list(users, "User list");
+res.list(
+  users,
+  {
+    paginate: true,
+    page: 1,
+    limit: 10,
+    transform: (u) => ({ id: u._id, name: u.name }),
+  },
+  "Users fetched successfully"
+);
 ```
 
 ### Paginated Query
 
 ```js
-await res.paginateQuery(UserModel, {
-  page: 1,
-  limit: 10,
-  filter: { isActive: true },
-  sort: { createdAt: -1 },
-});
+await res.paginateQuery(
+  UserModel,
+  {
+    page: 1,
+    limit: 10,
+    filter: { isActive: true },
+    sort: { createdAt: -1 },
+    populate: "profile",
+    transform: (doc) => ({ id: doc._id, email: doc.email }),
+  },
+  "Active users fetched"
+);
 ```
 
 ### Paginated Aggregate
 
 ```js
-await res.paginateAggregate(UserModel, {
-  page: 1,
-  limit: 10,
-  pipeline: [{ $match: { isActive: true } }],
-});
+await res.paginateAggregate(
+  UserModel,
+  {
+    page: 1,
+    limit: 10,
+    pipeline: [{ $match: { score: { $gt: 80 } } }, { $sort: { score: -1 } }],
+    transform: (doc) => ({ id: doc._id, score: doc.score }),
+  },
+  "High scorers fetched"
+);
 ```
-
-### DTO/ Transform Support (If you want to return a subset of fields or transform the response)
-
-```js
-res.success(user, "OK", {
-  transform: (u) => ({
-    id: u._id,
-    email: u.email,
-  }),
-});
-```
-
-Works for:
-
-- `success`
-- `created`
-- `updated`
-- `list`
-- `paginated`
 
 ## ❌ THROWING ERRORS
+
+You can throw custom errors anywhere in your logic; the error middleware will catch and format them.
 
 ```js
 import { NotFoundError } from "express-unified-response";
 
-throw new NotFoundError("User not found");
+app.get("/users/:id", async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) throw new NotFoundError("User not found");
+  res.success(user);
+});
 ```
-Even with `res.error()` you can still throw errors.
-```js
-res.error();
-```
-
-Handled automatically by error middleware.
 
 ### 🧱 Available Error Classes
 
@@ -239,12 +249,16 @@ Handled automatically by error middleware.
 </table>
 
 ### Mongoose-Specific
+
 - `MongooseValidationError`
 - `MongooseCastError`
 - `MongooseDuplicateKeyError`
 - `MongooseGeneralError`
 
-## 🔐 Async Handler (No Try/Catch)
+## 🔐 Utility: Async Handler (No Try/Catch)
+
+The toolkit provides a `asyncHandler` utility to catch async errors without try-catch blocks.
+
 ```js
 import { asyncHandler } from "express-unified-response";
 
@@ -256,33 +270,65 @@ app.get(
   })
 );
 ```
-## ⚙️ Configuration
+
+## ⚙️ Full Configuration
+
 ```js
-createResponseMiddleware({
+const config ={
   keys: {
-    dataKey: "result"
-  },
-  error: {
-    exposeStack: false,
-    exposeErrorName: false
+    successKey: "success",
+    dataKey: "data",
+    metaKey: "meta",
+    messageKey: "msg",
+    errorKey: "err",
   },
   pagination: {
     defaults: {
-      limit: 20,
-      maxLimit: 100
-    }
+      page: 1,
+      limit: 10,
+      maxLimit: 50, // safe limit for paginated lists, limit can never exceed this
+    },
+    labels: {
+      nextPage: "next",
+      prevPage: "prev",
+      totalDocs: "totalItems",
+      docs: "items",
+      totalPages: "totalPages",
+      limit: "perPage",
+      page: "currentPage",
+      hasPrevPage: "hasPrev",
+      hasNextPage: "hasNext",
+    },
   },
   restDefaults: {
-    deleteReturnsNoContent: true,
-    updateReturnsBody: true
+    deleteReturnsNoContent: true, // true for 204, false for 200
+    updateReturnsBody: true, // true for 200, false for 204
+    nonPaginatedMaxItems: 1000, // safe limit for non-paginated lists
   },
   logger: {
-    onSuccess: (status) => console.log("✔", status),
-    onError: (err, status) => console.error("✖", status, err.code)
-  }
-});
+    onSuccess: (req, status, duration) =>
+      console.log(`REQ ${req.method} ${req.originalUrl} ${status} - ${duration}ms`),
+    onError: (req, err, status, duration) => {
+      console.error(`REQ ${req.method} ${req.originalUrl} ${status} - ${duration}ms`);
+      console.error(err);
+    },
+  },
+  routeNotFound: true,
+  error: {
+    exposeStack: `${process.env.NODE_ENV}` !== "production",
+    exposeErrorName: false,
+    defaultErrorMessage: "An unexpected error occurred",
+  },
+};
+app.use(createResponseMiddleware(config));
+-----------------------------------------------
+app.use(createErrorMiddleware(config));
 ```
+
+> `Note:` Pass the same config to `createErrorMiddleware(config)`. to make them consistent.
+
 ## 📤 Error Response Example
+
 ```js
 {
   "success": false,
@@ -298,7 +344,9 @@ createResponseMiddleware({
   }
 }
 ```
+
 ## 🧠 Design Philosophy
+
 - Zero response duplication
 - Single source of truth for errors
 - REST-correct defaults
@@ -308,9 +356,11 @@ createResponseMiddleware({
 - Type-safe
 
 ## 📜 License
+
 MIT License
 
 ## 🤝 Ideal Use Cases
+
 - SaaS backends
 - REST APIs
 - Admin panels
@@ -318,9 +368,11 @@ MIT License
 - Enterprise Node.js systems
 
 ## 📝 Credits
+
 - [Sayantan Chakraborty](https://github.com/SayantanCode)
 
 ## 🌟 Star this project on GitHub
+
 [![Star](https://img.shields.io/github/stars/sayantanCode/express-unified-response?style=social)](https://github.com/sayantanCode/express-unified-response)
 
 ## Made with ❤️ by Sayantan Chakraborty
