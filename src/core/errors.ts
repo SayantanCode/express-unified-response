@@ -182,11 +182,25 @@ export class MongooseDuplicateKeyError extends BadRequestError {
   constructor(
     err: mongoose.mongo.MongoServerError & { code: number; keyValue?: any }
   ) {
+    // 1. Extract the field name (e.g., "email" or "metadata.serial")
     const field = err.keyValue ? Object.keys(err.keyValue)[0] : undefined;
+    
+    // 2. Safely extract the value, even if it's nested
+    let value = undefined;
+    if (field && err.keyValue) {
+      value = err.keyValue[field];
+      
+      // If the value is still an object, it means MongoDB returned a nested structure
+      // We take the first value found inside that nested object
+      if (typeof value === 'object' && value !== null) {
+        value = Object.values(value)[0];
+      }
+    }
+
     super("Duplicate key error", {
-      message: "Duplicate field value",
+      message: `Duplicate value found for field: ${field}`,
       field,
-      value: field && err.keyValue ? err.keyValue[field] : undefined,
+      value,
       code: String(err.code),
     });
   }
@@ -205,7 +219,7 @@ export class MongooseGeneralError extends AppError {
 /* -------------------------------------------------------------------------- */
 
 export function createAppError(err: unknown): AppError {
-  /* Already handled */
+  /* ------------------------------ APP ERRORS ----------------------------- */
   if (err instanceof AppError) return err;
 
   /* ---------------------------- AUTH / TOKENS ---------------------------- */

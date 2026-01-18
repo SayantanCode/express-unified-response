@@ -10,7 +10,6 @@ export const createErrorMiddleware = (config?: ResponseConfig) => {
   const handleNotFound = config?.routeNotFound !== false;
   const notFoundHandler = (req: any, res: any, next: any) => {
     if (handleNotFound) {
-      // We pass a specific 404 error to trigger the next middleware in the array.
       return next(new AppError(`Route ${req.originalUrl} not found`, 404, "ROUTE_NOT_FOUND"));
     }
     next();

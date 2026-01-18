@@ -24,33 +24,19 @@ It enforces consistent API responses, centralized error handling, and powerful p
 ### ❌ Centralized error handling
 
 - Custom AppError hierarchy
-- Automatic conversion of:
-  - Mongoose validation errors
-  - Mongoose cast errors
-  - Mongoose duplicate key errors
-  - JWT errors
-  - File upload errors
-  - Axios / external service errors
+- Automatic conversion of Mongoose errors (Validation, Cast, Duplicate Key).
+- Handles JWT, File Upload, and Axios errors automatically.
 - Safe defaults for production (no stack leaks)
 
 ### 📄 Pagination (Query + Aggregate)
 
-- Paginate standard Mongoose queries
-- Paginate aggregation pipelines
-- Supports transform (DTO) functions
-- Enforces max limits automatically
+- Paginate standard Mongoose queries and aggregation pipelines.
+- Supports DTO / Transform functions to clean data.
+- Enforces `maxLimit` automatically to protect your database.
 
 ### 🧠 Smart Middleware Extensions
 
-- Adds helper methods directly to res:
-  - `res.success()`
-  - `res.created()`
-  - `res.updated()`
-  - `res.deleted()`
-  - `res.list()`
-  - `res.paginateQuery()`
-  - `res.paginateAggregate()`
-  - `res.apperror()`
+Methods are attached directly to the `res` object: `res.success()`, `res.created()`, `res.updated()`, `res.deleted()`, `res.list()`, `res.paginateQuery()`, `res.paginateAggregate()`, `res.apperror()`.
 
 ### ⚙️ Fully configurable
 
@@ -98,11 +84,11 @@ export default app;
 
 ## 🟢 USING RESPONSE HELPERS
 
-The library follows 2 consistent pattern 1 for non paginated non array responses and 2 for paginated responses.
-like this:
-(1. (Data, Message, Options) or (Data, Message) or (Data) )
+The library follows two intuitive argument patterns:
 
-(2. (Data, Options, Message) or (Data, Options) )
+Standard: (Data, Message, Options)
+
+Paginated: (Data/Model, Options, Message)
 
 ### Success & Created
 
@@ -138,7 +124,7 @@ res.deleted(null, "User deleted");
 
 ### List (Paginated or Non Paginated)
 
-Useful for sending arrays of data while still supporting pagination.
+Standardizes array responses. Non-paginated lists still receive a meta block for frontend consistency.
 
 ```js
 res.list(
@@ -153,7 +139,7 @@ res.list(
 );
 ```
 
-### Paginated Query
+### Paginated Query & Aggregate
 
 ```js
 await res.paginateQuery(
@@ -162,23 +148,16 @@ await res.paginateQuery(
     page: 1,
     limit: 10,
     filter: { isActive: true },
-    sort: { createdAt: -1 },
     populate: "profile",
     transform: (doc) => ({ id: doc._id, email: doc.email }),
   },
   "Active users fetched"
 );
-```
 
-### Paginated Aggregate
-
-```js
 await res.paginateAggregate(
   UserModel,
   {
-    page: 1,
-    limit: 10,
-    pipeline: [{ $match: { score: { $gt: 80 } } }, { $sort: { score: -1 } }],
+    pipeline: [{ $match: { score: { $gt: 80 } } }],
     transform: (doc) => ({ id: doc._id, score: doc.score }),
   },
   "High scorers fetched"
@@ -201,59 +180,59 @@ app.get("/users/:id", async (req, res) => {
 
 ### 🧱 Available Error Classes
 
-<table>
-  <tr>
-    <th>Error Class</th>
-    <th>HTTP Status</th>
-  </tr>
-  <tr>
-    <td><code>BadRequestError</code></td>
-    <td><code>400</code></td>
-  </tr>
-  <tr>
-    <td><code>ValidationError</code></td>
-    <td><code>400</code></td>
-  </tr>
-  <tr>
-    <td><code>UnauthorizedError</code></td>
-    <td><code>401</code></td>
-  </tr>
-  <tr>
-    <td><code>ForbiddenError</code></td>
-    <td><code>403</code></td>
-  </tr>
-  <tr>
-    <td><code>NotFoundError</code></td>
-    <td><code>404</code></td>
-  </tr>
-  <tr>
-    <td><code>MethodNotAllowedError</code></td>
-    <td><code>405</code></td>
-  </tr>
-  <tr>
-    <td><code>PayloadTooLargeError</code></td>
-    <td><code>413</code></td>
-  </tr>
-  <tr>
-    <td><code>RateLimitError</code></td>
-    <td><code>429</code></td>
-  </tr>
-  <tr>
-    <td><code>ExternalServiceError</code></td>
-    <td><code>502</code></td>
-  </tr>
-  <tr>
-    <td><code>DatabaseError</code></td>
-    <td><code>503</code></td>
-  </tr>
+<table> 
+  <thead> 
+    <tr> 
+      <th>Category</th> 
+      <th>Error Class</th> 
+      <th>HTTP Status</th> 
+    </tr> 
+  </thead>
+  <tbody> 
+    <tr> 
+      <td rowspan="4"><b>Client (4xx)</b></td> <td><code>BadRequestError</code></td> <td><code>400</code></td> 
+    </tr>
+    <tr> 
+      <td><code>ValidationError</code></td> <td><code>400</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>NotFoundError</code></td> 
+      <td><code>404</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>RateLimitError</code></td> 
+      <td><code>429</code></td> 
+    </tr> 
+    <tr> 
+      <td rowspan="3"><b>Security</b></td> <td><code>UnauthorizedError</code></td> <td><code>401</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>TokenExpiredError</code></td> <td><code>401</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>ForbiddenError</code></td> 
+      <td><code>403</code></td> 
+    </tr> 
+    <tr> 
+      <td rowspan="3"><b>Server (5xx)</b></td> <td><code>ExternalServiceError</code></td> <td><code>502</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>DatabaseError</code></td> 
+      <td><code>503</code></td> 
+    </tr> 
+    <tr> 
+      <td><code>AppError</code> (Base)</td> <td><code>500</code></td> 
+    </tr> 
+  </tbody> 
 </table>
 
-### Mongoose-Specific
+### ✨ Automatic Mongoose & JWT Mapping
 
-- `MongooseValidationError`
-- `MongooseCastError`
-- `MongooseDuplicateKeyError`
-- `MongooseGeneralError`
+You don't always have to throw these manually. The middleware automatically detects and converts:
+
+- **Mongoose:** `ValidationError`, `CastError`, and `DuplicateKey (11000)` are converted to their respective 400 classes.
+- **JWT:** `TokenExpiredError` and `JsonWebTokenError` are mapped to 401.
+- **Multer:** File size limits and unexpected fields are mapped to `FileUploadError`.
 
 ## 🔐 Utility: Async Handler (No Try/Catch)
 
@@ -274,7 +253,7 @@ app.get(
 ## ⚙️ Full Configuration
 
 ```js
-const config ={
+const config = {
   keys: {
     successKey: "success",
     dataKey: "data",
@@ -307,11 +286,8 @@ const config ={
   },
   logger: {
     onSuccess: (req, status, duration) =>
-      console.log(`REQ ${req.method} ${req.originalUrl} ${status} - ${duration}ms`),
-    onError: (req, err, status, duration) => {
-      console.error(`REQ ${req.method} ${req.originalUrl} ${status} - ${duration}ms`);
-      console.error(err);
-    },
+      console.log(`✔ ${req.method} ${status} (${duration}ms)`),
+    onError: (req, err, status) => console.error(`✖ ${err.code} [${status}]`),
   },
   routeNotFound: true,
   error: {
@@ -321,51 +297,44 @@ const config ={
   },
 };
 app.use(createResponseMiddleware(config));
------------------------------------------------
 app.use(createErrorMiddleware(config));
 ```
 
 > `Note:` Pass the same config to `createErrorMiddleware(config)`. to make them consistent.
 
-## 📤 Error Response Example
+## 📤 Response Examples
 
-```js
+Success List (Paginated)
+
+```json
 {
-  "success": false,
-  "message": "Validation failed",
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "details": [
-      {
-        "field": "email",
-        "message": "Email is required"
-      }
-    ]
+  "success": true,
+  "data": [{ "id": "123", "score": 90 }],
+  "meta": {
+    "currentPage": 1,
+    "totalItems": 1,
+    "totalPages": 1,
+    "hasNextPage": false
   }
 }
 ```
 
-## 🧠 Design Philosophy
+Error
 
-- Zero response duplication
-- Single source of truth for errors
-- REST-correct defaults
-- Production-safe
-- Framework-agnostic mindset
-- Easy to customize
-- Type-safe
+```json
+{
+  "success": false,
+  "msg": "Validation failed",
+  "err": {
+    "code": "VALIDATION_ERROR",
+    "details": [{ "field": "email", "message": "Required" }]
+  }
+}
+```
 
 ## 📜 License
 
 MIT License
-
-## 🤝 Ideal Use Cases
-
-- SaaS backends
-- REST APIs
-- Admin panels
-- Microservices
-- Enterprise Node.js systems
 
 ## 📝 Credits
 

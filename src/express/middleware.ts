@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ResponseBuilder } from "../core/responseBuilder";
 import { Paginator } from "../core/paginator";
 import { ResponseConfig } from "../config/types";
-import { AppError, createAppError } from "../core/errors";
+import { AppError } from "../core/errors";
 // import { RequestWithStartTime } from "./types";
 // import { AppError, createAppError } from "../core/errors";
 
@@ -19,11 +19,11 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       const durationMs = Date.now() - startTime;
       builder.config.logger?.onSuccess?.(req, statusCode, durationMs);
     };
-    const logError = (err: unknown, statusCode: number) => {
-      const durationMs = Date.now() - startTime;
-      const appErr = createAppError(err);
-      builder.config.logger?.onError?.(req, appErr, statusCode, durationMs);
-    };
+    // const logError = (err: unknown, statusCode: number) => {
+    //   const durationMs = Date.now() - startTime;
+    //   const appErr = createAppError(err);
+    //   builder.config.logger?.onError?.(req, appErr, statusCode, durationMs);
+    // };
     // No type casting needed - As I am doing declaration merging for express Response
     res.success = (data: any, message?: string, options: { transform?: any, shouldLog?: boolean } = {}) => {
       const { statusCode, body, shouldLog } = builder.success(data, message, options);
@@ -113,14 +113,14 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
     //   res.status(statusCode).json(body);
     // };
 
-    res.error = (err: unknown) => {
-      const { statusCode, body, shouldLog } = builder.apperror(err);
-      // if (builder.config.logger?.onError) {
-      //   builder.config.logger?.onError(createAppError(err), statusCode);
-      // }
-      if (shouldLog) logError(err, statusCode);
-      res.status(statusCode).json(body);
-    };
+    // res.error = (err: unknown) => {
+    //   const { statusCode, body, shouldLog } = builder.apperror(err);
+    //   // if (builder.config.logger?.onError) {
+    //   //   builder.config.logger?.onError(createAppError(err), statusCode);
+    //   // }
+    //   if (shouldLog) logError(err, statusCode);
+    //   res.status(statusCode).json(body);
+    // };
 
     res.paginateQuery = async (model: any, options: any, message?: string) => {
       //check options.transform must be a function

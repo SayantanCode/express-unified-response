@@ -53,7 +53,7 @@ declare module "express-serve-static-core" {
   }
   interface Response {
     //------------- Basic Methods ----------------
-    
+
     success: <T, R = T>(
       data: T,
       message?: string,
@@ -74,7 +74,7 @@ declare module "express-serve-static-core" {
 
     deleted: (data?: any, message?: string) => void;
 
-    error: (err: unknown, options?: { silent?: boolean }) => void;
+    // error: (err: unknown, options?: { silent?: boolean }) => void;
 
 
     //------------- Paginated Methods ----------------
