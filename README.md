@@ -15,7 +15,7 @@ It enforces consistent API responses, centralized error handling, and powerful p
 
 ## ✨ FEATURES
 
-### ✅ Unified API Responses Unified API responses
+### ✅ Unified API responses
 
 - Standard success, created, updated, deleted responses
 - Configurable response keys (success, data, meta, message, error)
