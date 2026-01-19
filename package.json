@@ -41,7 +41,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sayantanCode/express-unified-response.git"
+    "url": "git+https://github.com/SayantanCode/express-unified-response.git"
   },
   "author": "Sayantan Chakraborty",
   "license": "MIT",
