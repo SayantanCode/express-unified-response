@@ -1,7 +1,7 @@
 {
   "name": "express-unified-response",
   "version": "1.0.0",
-  "description": "express-unified-response provides a production-ready solution for consistent API responses, centralized error handling, and smart pagination in Express applications. It includes a robust AppError system, automatic Mongoose error normalization, query and aggregate pagination helpers, DTO/transform support, REST-correct response defaults, and async handler utilities — all designed to reduce boilerplate and enforce clean API standards.",
+  "description": "Production-ready Express API response standardizer. Features centralized error handling, Mongoose error normalization, smart pagination, and DTO transforms.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -23,18 +23,26 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "npm run build",
-    "release:patch": "npm version patch -m 'chore(release): %s' && git push origin dev --follow-tags",
-    "release:minor": "npm version minor -m 'chore(release): %s' && git push origin dev --follow-tags",
-    "release:major": "npm version major -m 'chore(release): %s' && git push origin dev --follow-tags"
+    "release:patch": "npm version patch -m 'chore(release): %s' && git push origin HEAD --follow-tags",
+    "release:minor": "npm version minor -m 'chore(release): %s' && git push origin HEAD --follow-tags",
+    "release:major": "npm version major -m 'chore(release): %s' && git push origin HEAD --follow-tags"
   },
   "keywords": [
-    "express",
-    "response",
-    "error-handler",
-    "pagination",
-    "mongoose",
-    "typescript"
+    "express-unified-response",
+    "express-error-handler",
+    "api-response-formatter",
+    "mongoose-pagination-helper",
+    "unified-api-response",
+    "express-async-handler",
+    "standardized-rest-response",
+    "express-middleware",
+    "mongoose-error-normalization",
+    "dto-transform"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sayantanCode/express-unified-response.git"
+  },
   "author": "Sayantan Chakraborty",
   "license": "MIT",
   "peerDependencies": {
