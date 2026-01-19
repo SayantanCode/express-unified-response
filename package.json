@@ -1,6 +1,6 @@
 {
   "name": "express-unified-response",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production-ready Express API response standardizer. Features centralized error handling, Mongoose error normalization, smart pagination, and DTO transforms.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
