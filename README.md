@@ -36,7 +36,7 @@ It enforces consistent API responses, centralized error handling, and powerful p
 
 ### 🧠 Smart Middleware Extensions
 
-Methods are attached directly to the `res` object: `res.success()`, `res.created()`, `res.updated()`, `res.deleted()`, `res.list()`, `res.paginateQuery()`, `res.paginateAggregate()`, `res.apperror()`.
+Methods are attached directly to the `res` object: `res.success()`, `res.created()`, `res.updated()`, `res.deleted()`, `res.list()`, `res.paginateQuery()`, `res.paginateAggregate()`.
 
 ### ⚙️ Fully configurable
 
