@@ -54,7 +54,7 @@ npm install express-unified-response
 
 > Requirements
 
-- Node.js ≥ 16
+- Node.js ≥ 20
 - Express
 - Mongoose
 

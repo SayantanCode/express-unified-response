@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Ignore example for now
+example/
+
 # Environment & Sensitive data
 .env
 *.log

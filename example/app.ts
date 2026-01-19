@@ -91,7 +91,7 @@ app.get("/users", async (req, res) => {
 // list all tags‑like example (non‑paginated)
 app.get("/users/all", async (req, res) => {
   const users = await UserModel.find({ active: true }).limit(1000).lean();
-  res.list(users, "All active users");
+  res.list(users, { paginate: false }, "All active users");
 });
 
 // get single user
@@ -128,7 +128,7 @@ app.post("/users/validate", async (req, res) => {
   }
   const user = await UserModel.create(req.body);
   if(!user) {
-    res.error("User creation failed");
+    throw new Error("User creation failed");
   } else {
     res.created(user, "User created");
   }
