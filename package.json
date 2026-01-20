@@ -23,9 +23,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "npm run build",
-    "release:patch": "npm version patch -m 'chore(release): %s' && git push origin HEAD --follow-tags",
-    "release:minor": "npm version minor -m 'chore(release): %s' && git push origin HEAD --follow-tags",
-    "release:major": "npm version major -m 'chore(release): %s' && git push origin HEAD --follow-tags"
+    "release:patch": "npm version patch -m \"chore(release): %s\" && git push origin HEAD --follow-tags",
+    "release:minor": "npm version minor -m \"chore(release): %s\" && git push origin HEAD --follow-tags",
+    "release:major": "npm version major -m \"chore(release): %s\" && git push origin HEAD --follow-tags"
   },
   "keywords": [
     "express-unified-response",

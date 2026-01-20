@@ -25,17 +25,30 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
     //   builder.config.logger?.onError?.(req, appErr, statusCode, durationMs);
     // };
     // No type casting needed - As I am doing declaration merging for express Response
-    res.success = (data: any, message?: string, options: { transform?: any, shouldLog?: boolean } = {}) => {
-      const { statusCode, body, shouldLog } = builder.success(data, message, options);
+    res.success = (
+      data: any,
+      message?: string,
+      options: { transform?: any; shouldLog?: boolean } = {}
+    ) => {
+      const { statusCode, body, shouldLog } = builder.success(
+        data,
+        message,
+        options
+      );
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);
       // }
-      const finalLogControl = options.shouldLog !== undefined ? options.shouldLog : shouldLog;
+      const finalLogControl =
+        options.shouldLog !== undefined ? options.shouldLog : shouldLog;
       if (finalLogControl) logSuccess(statusCode);
       res.status(statusCode).json(body);
     };
 
-    res.created = (data: any, message?: string, options: { transform?: any, silent?: boolean } = {}) => {
+    res.created = (
+      data: any,
+      message?: string,
+      options: { transform?: any; silent?: boolean } = {}
+    ) => {
       const { statusCode, body, shouldLog } = builder.created(
         data,
         message,
@@ -49,7 +62,11 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       res.status(statusCode).json(body);
     };
 
-    res.updated = (data?: any, message?: string, options: { transform?: any, silent?: boolean } = {}) => {
+    res.updated = (
+      data?: any,
+      message?: string,
+      options: { transform?: any; silent?: boolean } = {}
+    ) => {
       const { statusCode, body, shouldLog } = builder.updated(
         data,
         message,
@@ -64,8 +81,16 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       else res.sendStatus(statusCode);
     };
 
-    res.deleted = (data?: any, message?: string, options:{ silent?: boolean } = {}) => {
-      const { statusCode, body, shouldLog } = builder.deleted(data, message, options);
+    res.deleted = (
+      data?: any,
+      message?: string,
+      options: { silent?: boolean } = {}
+    ) => {
+      const { statusCode, body, shouldLog } = builder.deleted(
+        data,
+        message,
+        options
+      );
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);
       // }
@@ -93,7 +118,9 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
         );
       }
       const result = await paginator.paginateList(data, options);
-      const { statusCode, body, shouldLog } = builder.list(result, message);
+      const { statusCode, body, shouldLog } = builder.list(result, message, {
+        silent: options.silent,
+      });
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);
       // }
@@ -135,7 +162,8 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       const result = await paginator.paginateQuery(model, options);
       const { statusCode, body, shouldLog } = builder.paginated(
         result,
-        message
+        message,
+        { silent: options.silent }
       );
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(statusCode);
@@ -160,7 +188,8 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       const result = await paginator.paginateAggregate(model, options);
       const { statusCode, body, shouldLog } = builder.paginated(
         result,
-        message
+        message,
+        { silent: options.silent }
       );
       // if (builder.config.logger?.onSuccess) {
       //   builder.config.logger.onSuccess(req);
