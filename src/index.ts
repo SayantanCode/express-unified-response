@@ -1,17 +1,29 @@
 // src/index.ts
 import "./express/types";
-export * from "./express/middleware";
-export * from "./express/errorMiddleware";
+
+export type { 
+  ResponseOptions, 
+  ListOptions, 
+  QueryOptions, 
+  AggregateOptions 
+} from "./express/types";
+
+export { createResponseMiddleware } from "./express/middleware";
+export { createErrorMiddleware } from "./express/errorMiddleware";
 
 
-export * from "./config/responseConfig";
-export * from "./config/types";
+export type { ResponseConfig, ResponseKeyMapping } from "./config/types";
 
-export * from "./core/responseBuilder";
-export * from "./core/errors";
-export * from "./core/paginator";
-// export * from "./core/types";
+export type { ErrorAdapter, PaginatedResult, ErrorDetails } from "./core/types";
 
-export * from "./utils/asyncHandler";
+export {
+  AppError,
+  createAppError,
+  NotFoundError,
+  ValidationError,
+  UnauthorizedError,
+  ForbiddenError,
+  BadRequestError,
+} from "./core/errors";
 
-
+export { asyncHandler } from "./utils/asyncHandler";

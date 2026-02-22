@@ -1,3 +1,5 @@
+import { AppError } from "./errors";
+
 export interface ErrorDetails {
   message: string;
   code?: string;
@@ -18,4 +20,4 @@ export interface PaginatedResult<T> {
   prevPage: number | null;
 }
 
-
+export type ErrorAdapter = (err: unknown) => AppError | null;

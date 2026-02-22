@@ -1,4 +1,5 @@
 import { AppError } from "../core/errors";
+import { ErrorAdapter } from "../core/types";
 
 export interface ResponseKeyMapping {
   successKey?: string;
@@ -43,6 +44,7 @@ export interface RestDefaults {
 }
 
 export interface ResponseConfig {
+  adapters?: ErrorAdapter[];
   keys?: ResponseKeyMapping;
   error?: ErrorExposureConfig;
   pagination?: {
@@ -59,6 +61,7 @@ export interface ResponseConfig {
 }
 
 export interface ResolvedResponseConfig {
+  adapters: ErrorAdapter[];
   keys: Required<ResponseKeyMapping>;
   error: Required<ErrorExposureConfig>;
   pagination: {

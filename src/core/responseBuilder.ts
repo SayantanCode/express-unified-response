@@ -5,6 +5,7 @@ import { ResolvedResponseConfig, ResponseConfig } from "../config/types";
 import { AppError, createAppError } from "./errors";
 import { PaginatedResult } from "./types";
 import { TransformFn } from "./paginator";
+import { ErrorAdapter } from "./types";
 
 /**
  * Central builder for all success, paginated, list and error responses.
@@ -438,10 +439,18 @@ export class ResponseBuilder {
    */
   apperror(
     err: unknown,
-    options?: { silent?: boolean }
-  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
-    const { silent } = options || {};
-    const appErr: AppError = createAppError(err);
+    options?: { silent?: boolean, adapters?: ErrorAdapter[] }
+  ): {
+    statusCode: number;
+    body: Record<string, any>;
+    shouldLog: boolean;
+    error: AppError;
+  } {
+    const { silent, adapters: methodAdapters } = options || {};
+    // Merge adapters: Method-level adapters come first, then global config adapters
+  const globalAdapters = this.config.adapters || [];
+  const combinedAdapters = [...(methodAdapters || []), ...globalAdapters];
+    const appErr: AppError = createAppError(err, combinedAdapters);
     const { keys, error } = this.config;
     const { errorKey, messageKey, successKey } = keys;
 
@@ -465,6 +474,7 @@ export class ResponseBuilder {
       statusCode: appErr.statusCode,
       body,
       shouldLog: this.shouldLog({ silent }),
+      error: appErr,
     };
   }
 }

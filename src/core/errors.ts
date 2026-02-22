@@ -2,6 +2,8 @@
 
 import mongoose from "mongoose";
 import { ErrorDetails } from "./types";
+import { ErrorAdapter } from "./types";
+import { internalLogger } from '../utils/logger';
 
 /* -------------------------------------------------------------------------- */
 /*                                   BASE                                     */
@@ -218,8 +220,38 @@ export class MongooseGeneralError extends AppError {
 /*                               ERROR FACTORY                                 */
 /* -------------------------------------------------------------------------- */
 
-export function createAppError(err: unknown): AppError {
-  /* ------------------------------ APP ERRORS ----------------------------- */
+export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): AppError {
+  /* -------------------------- CUSTOM ADAPTERS ------------------------- */
+  // Give priority to user-defined adapters
+  // for (const adapter of customAdapters) {
+  //   const result = adapter(err);
+  //   if (result instanceof AppError) return result;
+  // }
+  if (Array.isArray(customAdapters)) {
+    for (const [index, adapter] of customAdapters.entries()) {
+      try {
+        // Skip if adapter isn't a function (safety for JS users)
+        if (typeof adapter !== 'function') continue;
+
+        const result = adapter(err);
+        
+        // Only return if the adapter actually returned an AppError instance
+        if (result instanceof AppError) return result;
+      } catch (adapterError) {
+        /**
+         * SAFETY SHIELD: 
+         * If a user's custom adapter crashes, we catch it here.
+         * We log it so the developer knows their adapter is broken,
+         * but we don't let it crash the whole request.
+         */
+        internalLogger.adapterError(`Adapter at index ${index}`, adapterError);
+        // Continue to the next adapter or built-in logic
+        continue; 
+      }
+    }
+  }
+
+  /* ------------------------------BUILT-IN LOGIC APP ERRORS ----------------------------- */
   if (err instanceof AppError) return err;
 
   /* ---------------------------- AUTH / TOKENS ---------------------------- */

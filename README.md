@@ -1,9 +1,9 @@
 # express-unified-response
 
-<!-- [![npm version](https://img.shields.io/npm/v/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
+[![npm version](https://img.shields.io/npm/v/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
 [![npm downloads](https://img.shields.io/npm/dm/express-unified-response)](https://www.npmjs.com/package/express-unified-response)
 [![license](https://img.shields.io/npm/l/express-unified-response)](LICENSE)
-[![node](https://img.shields.io/node/v/express-unified-response)](https://nodejs.org) -->
+<!-- [![node](https://img.shields.io/node/v/express-unified-response)](https://nodejs.org) -->
 
 ![express](https://img.shields.io/badge/express-middleware-black)
 ![typescript](https://img.shields.io/badge/typescript-supported-blue)
@@ -289,6 +289,10 @@ const config = {
       console.log(`✔ ${req.method} ${status} (${duration}ms)`),
     onError: (req, err, status) => console.error(`✖ ${err.code} [${status}]`),
   },
+  silent: process.env.NODE_ENV === 'production', //[new] disable logging from middleware
+  adapters: [
+    (err) => err.code === 'P2002' ? new AppError('Conflict', 409, 'DB_ERR') : null // like this 
+  ] // [new] custom error adapters
   routeNotFound: true,
   error: {
     exposeStack: `${process.env.NODE_ENV}` !== "production",

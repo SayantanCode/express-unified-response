@@ -49,6 +49,11 @@
     "express": "^4.0.0 || ^5.0.0",
     "mongoose": "^7.0.0 || ^8.0.0 || ^9.0.0"
   },
+  "peerDependenciesMeta": {
+    "mongoose": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
@@ -61,5 +66,8 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.52.0",
     "vitest": "^4.0.16"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2"
   }
 }
