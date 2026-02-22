@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [1.0.3] - 22nd February, 2026
+## [1.1.1] - 22nd February, 2026
 ### Added
 - Custom Error Adapters: You can now plug in custom logic to handle errors from any library (Prisma, Postgres, etc.) without touching the core code.
 - Morgan-Style Logging: Beautiful, color-coded console logs out-of-the-box that look just like morgan('dev').
