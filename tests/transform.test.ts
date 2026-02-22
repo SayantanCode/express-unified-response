@@ -4,7 +4,8 @@
 import { describe, it, expect } from "vitest";
 import express from "express";
 import request from "supertest";
-import { createResponseMiddleware, Paginator } from "../src/index";
+import { createResponseMiddleware } from "../src/index";
+import { Paginator } from "../src/core/paginator";
 
 describe("Data Transformation (DTO)", () => {
   const app = express();
