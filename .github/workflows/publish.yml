@@ -4,11 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'package.json'  # Only run when version changes
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
       id-token: write
@@ -32,45 +33,27 @@ jobs:
       - name: Run Tests
         run: npm test
 
-      - name: Configure Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Determine Version Bump
-        id: bump
-        run: |
-          BUMP_TYPE="patch"
-
-          COMMITS=$(git log --format=%s HEAD~20..HEAD)
-
-          echo "$COMMITS"
-
-          if echo "$COMMITS" | grep -qiE "major:"; then
-            BUMP_TYPE="major"
-          elif echo "$COMMITS" | grep -qiE "minor:"; then
-            BUMP_TYPE="minor"
-          fi
-
-          echo "Detected bump type: $BUMP_TYPE"
-
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-
-      - name: Bump Version
-        run: |
-          BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
-
-          npm version $BUMP_TYPE -m "chore(release): %s [skip ci]"
-
       - name: Run Build
         run: npm run build
 
-      - name: Check dist
-        run: ls -R dist
+      - name: Check if version already published
+        run: |
+          VERSION=$(npm pkg get version --workspaces=false | tr -d '"')
+          if npm view express-unified-response@$VERSION > /dev/null 2>&1; then
+            echo "Version $VERSION already published. Skipping publish."
+            exit 0
+          fi
 
       - name: Publish to NPM
         run: npm publish --access public --provenance
 
-      - name: Push Version Changes and Tags
+      - name: Configure Git for Tag
         run: |
-          git push origin main --follow-tags
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and Push Git Tag
+        run: |
+          VERSION=$(npm pkg get version --workspaces=false | tr -d '"')
+          git tag v$VERSION
+          git push origin v$VERSION
