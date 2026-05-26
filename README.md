@@ -13,7 +13,7 @@
 A production-ready response, error handling, and pagination toolkit for Express + Mongoose APIs.
 It enforces consistent API responses, centralized error handling, and powerful pagination with minimal boilerplate.
 
-## ✨ FEATURES
+## FEATURES
 
 ### ✅ Unified API responses
 
