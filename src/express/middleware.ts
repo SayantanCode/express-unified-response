@@ -109,67 +109,47 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
     // };
 
     res.list = async (data: any[], options: any = {}, message?: string) => {
-      const { transform } = options;
-      if (transform && typeof transform !== "function") {
-        throw new AppError(
-          "Transform must be a function",
-          400,
-          "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
-        );
+      try {
+        const { transform } = options;
+        if (transform && typeof transform !== "function") {
+          throw new AppError(
+            "Transform must be a function",
+            400,
+            "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+          );
+        }
+        const result = await paginator.paginateList(data, options);
+        const { statusCode, body, shouldLog } = builder.list(result, message, {
+          silent: options.silent,
+        });
+        if (shouldLog) logSuccess(statusCode);
+        res.status(statusCode).json(body);
+      } catch (err) {
+        next(err);
       }
-      const result = await paginator.paginateList(data, options);
-      const { statusCode, body, shouldLog } = builder.list(result, message, {
-        silent: options.silent,
-      });
-      // if (builder.config.logger?.onSuccess) {
-      //   builder.config.logger.onSuccess(statusCode);
-      // }
-      if (shouldLog) logSuccess(statusCode);
-      res.status(statusCode).json(body);
     };
-    // res.paginated = (result: any, message?: string, transform?: any) => {
-    //   const { statusCode, body, shouldLog } = builder.paginated(
-    //     result,
-    //     message,
-    //     transform
-    //   );
-    //   // if (builder.config.logger?.onSuccess) {
-    //   //   builder.config.logger.onSuccess(statusCode);
-    //   // }
-    //   if (shouldLog) logSuccess(statusCode);
-    //   res.status(statusCode).json(body);
-    // };
-
-    // res.error = (err: unknown) => {
-    //   const { statusCode, body, shouldLog } = builder.apperror(err);
-    //   // if (builder.config.logger?.onError) {
-    //   //   builder.config.logger?.onError(createAppError(err), statusCode);
-    //   // }
-    //   if (shouldLog) logError(err, statusCode);
-    //   res.status(statusCode).json(body);
-    // };
 
     res.paginateQuery = async (model: any, options: any, message?: string) => {
-      //check options.transform must be a function
-      const transform = options?.transform;
-      if (transform && typeof transform !== "function") {
-        throw new AppError(
-          "Transform must be a function",
-          400,
-          "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+      try {
+        const transform = options?.transform;
+        if (transform && typeof transform !== "function") {
+          throw new AppError(
+            "Transform must be a function",
+            400,
+            "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+          );
+        }
+        const result = await paginator.paginateQuery(model, options);
+        const { statusCode, body, shouldLog } = builder.paginated(
+          result,
+          message,
+          { silent: options.silent }
         );
+        if (shouldLog) logSuccess(statusCode);
+        res.status(statusCode).json(body);
+      } catch (err) {
+        next(err);
       }
-      const result = await paginator.paginateQuery(model, options);
-      const { statusCode, body, shouldLog } = builder.paginated(
-        result,
-        message,
-        { silent: options.silent }
-      );
-      // if (builder.config.logger?.onSuccess) {
-      //   builder.config.logger.onSuccess(statusCode);
-      // }
-      if (shouldLog) logSuccess(statusCode);
-      res.status(statusCode).json(body);
     };
 
     res.paginateAggregate = async (
@@ -177,25 +157,26 @@ export const createResponseMiddleware = (config?: ResponseConfig) => {
       options: any,
       message?: string
     ) => {
-      const transform = options?.transform;
-      if (transform && typeof transform !== "function") {
-        throw new AppError(
-          "Transform must be a function",
-          400,
-          "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+      try {
+        const transform = options?.transform;
+        if (transform && typeof transform !== "function") {
+          throw new AppError(
+            "Transform must be a function",
+            400,
+            "EX_UNI_RESP:TRANSFORM_MUST_BE_FUNCTION"
+          );
+        }
+        const result = await paginator.paginateAggregate(model, options);
+        const { statusCode, body, shouldLog } = builder.paginated(
+          result,
+          message,
+          { silent: options.silent }
         );
+        if (shouldLog) logSuccess(statusCode);
+        res.status(statusCode).json(body);
+      } catch (err) {
+        next(err);
       }
-      const result = await paginator.paginateAggregate(model, options);
-      const { statusCode, body, shouldLog } = builder.paginated(
-        result,
-        message,
-        { silent: options.silent }
-      );
-      // if (builder.config.logger?.onSuccess) {
-      //   builder.config.logger.onSuccess(req);
-      // }
-      if (shouldLog) logSuccess(statusCode);
-      res.status(statusCode).json(body);
     };
 
     next();

@@ -2,18 +2,23 @@ name: Publish to NPM
 
 on:
   push:
-    tags:
-      - 'v*' # Triggers only when a tag starting with 'v' is pushed (e.g., v1.0.2)
+    branches:
+      - main
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write # Required for provenance
+      contents: write
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -26,13 +31,68 @@ jobs:
       - name: Run Tests
         run: npm test
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine Version Bump
+        id: bump
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          
+          # Fetch the latest version from NPM registry (default to 0.0.0 if not published yet)
+          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+          
+          echo "Package: $PACKAGE_NAME"
+          echo "Local version: $LOCAL_VERSION"
+          echo "NPM version: $NPM_VERSION"
+          
+          # Default to patch
+          BUMP_TYPE="patch"
+          
+          # Check commits in this push event to determine bump type
+          # Loops through all commits in the push event
+          for commit_msg in $(echo '${{ toJson(github.event.commits) }}' | jq -r '.[] | .message'); do
+            if echo "$commit_msg" | grep -qiE "\[major\]|major:"; then
+              BUMP_TYPE="major"
+              break
+            elif echo "$commit_msg" | grep -qiE "\[minor\]|minor:"; then
+              BUMP_TYPE="minor"
+            fi
+          done
+          
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "npm_version=$NPM_VERSION" >> $GITHUB_OUTPUT
+          echo "local_version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Bump Version
+        run: |
+          NPM_VER="${{ steps.bump.outputs.npm_version }}"
+          LOCAL_VER="${{ steps.bump.outputs.local_version }}"
+          BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
+          
+          # Align local package version with NPM if a valid version exists on NPM registry
+          if [ "$NPM_VER" != "0.0.0" ]; then
+            echo "Aligning package version to latest published npm version ($NPM_VER) before bumping."
+            npm version $NPM_VER --no-git-tag-version --allow-same-version
+          else
+            echo "No published version found on npm. Using local version ($LOCAL_VER) as base."
+          fi
+          
+          # Perform version increment, commit, and release tag creation
+          npm version $BUMP_TYPE -m "chore(release): %s [skip ci]"
+
       - name: Run Build
         run: npm run build
 
       - name: Check if dist exists
-        run: ls -R dist # This will show the files in the logs so you can verify them
-          
+        run: ls -R dist
+
+      - name: Push Version Changes and Tag
+        run: |
+          git push origin main --follow-tags
+
       - name: Publish to NPM
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

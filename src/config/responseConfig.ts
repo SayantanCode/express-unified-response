@@ -20,7 +20,7 @@ const defaultKeys: Required<ResponseKeyMapping> = {
 };
 
 const defaultError: Required<ErrorExposureConfig> = {
-  exposeStack: true,
+  exposeStack: false,
   exposeErrorName: false,
   defaultErrorMessage: "Internal server error",
 };
@@ -51,7 +51,7 @@ export const defaultConfig: ResolvedResponseConfig = {
 const defaultLogger = {
   onSuccess: (req?: any, statusCode?: number, durationMs?: number) => {
     const method = chalk.bold((req?.method || "").padEnd(7)); // Keeps column alignment
-    const url = req?.originalUrl || req.url || "-";
+    const url = req?.originalUrl || req?.url || "-";
     
     // Status color logic (2xx green, 3xx cyan)
     const sc = statusCode ?? 0;
