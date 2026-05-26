@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
       id-token: write
@@ -22,8 +23,8 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm ci
@@ -39,60 +40,37 @@ jobs:
       - name: Determine Version Bump
         id: bump
         run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          LOCAL_VERSION=$(node -p "require('./package.json').version")
-          
-          # Fetch the latest version from NPM registry (default to 0.0.0 if not published yet)
-          NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
-          
-          echo "Package: $PACKAGE_NAME"
-          echo "Local version: $LOCAL_VERSION"
-          echo "NPM version: $NPM_VERSION"
-          
-          # Default to patch
           BUMP_TYPE="patch"
-          
-          # Check commits in this push event to determine bump type
-          # Loops through all commits in the push event
-          for commit_msg in $(echo '${{ toJson(github.event.commits) }}' | jq -r '.[] | .message'); do
-            if echo "$commit_msg" | grep -qiE "\[major\]|major:"; then
-              BUMP_TYPE="major"
-              break
-            elif echo "$commit_msg" | grep -qiE "\[minor\]|minor:"; then
-              BUMP_TYPE="minor"
-            fi
-          done
-          
+
+          COMMITS=$(git log --format=%s HEAD~20..HEAD)
+
+          echo "$COMMITS"
+
+          if echo "$COMMITS" | grep -qiE "major:"; then
+            BUMP_TYPE="major"
+          elif echo "$COMMITS" | grep -qiE "minor:"; then
+            BUMP_TYPE="minor"
+          fi
+
+          echo "Detected bump type: $BUMP_TYPE"
+
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-          echo "npm_version=$NPM_VERSION" >> $GITHUB_OUTPUT
-          echo "local_version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
 
       - name: Bump Version
         run: |
-          NPM_VER="${{ steps.bump.outputs.npm_version }}"
-          LOCAL_VER="${{ steps.bump.outputs.local_version }}"
           BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
-          
-          # Align local package version with NPM if a valid version exists on NPM registry
-          if [ "$NPM_VER" != "0.0.0" ]; then
-            echo "Aligning package version to latest published npm version ($NPM_VER) before bumping."
-            npm version $NPM_VER --no-git-tag-version --allow-same-version
-          else
-            echo "No published version found on npm. Using local version ($LOCAL_VER) as base."
-          fi
-          
-          # Perform version increment, commit, and release tag creation
+
           npm version $BUMP_TYPE -m "chore(release): %s [skip ci]"
 
       - name: Run Build
         run: npm run build
 
-      - name: Check if dist exists
+      - name: Check dist
         run: ls -R dist
-
-      - name: Push Version Changes and Tag
-        run: |
-          git push origin main --follow-tags
 
       - name: Publish to NPM
         run: npm publish --access public --provenance
+
+      - name: Push Version Changes and Tags
+        run: |
+          git push origin main --follow-tags
