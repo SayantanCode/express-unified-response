@@ -1,6 +1,21 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.1.2] - May 27, 2026
+
+### Fixed
+- **Mongoose Compatibility**: Refactored `asyncHandler` to be context-aware. It now correctly preserves the `this` binding and function `length`, allowing it to work seamlessly with Mongoose `pre` hooks and Express route matching.
+- **Optional Dependency Crash**: Removed hard runtime requirement for Mongoose. The package now uses type-only imports and string-based name checks, preventing crashes in non-Mongoose projects.
+- **Security**: Changed `exposeStack` default to `false`. Stack traces are now hidden by default in API responses to prevent sensitive data leakage in production.
+
+### Added
+- **Auto-Error Propagation**: Added `try/catch` wrappers to `res.paginateQuery`, `res.paginateAggregate`, and `res.list`. These helpers now automatically call `next(err)` on failure, ensuring errors reach the global handler even if the user forgets to use `asyncHandler`.
+- **Flexible AppError**: The `code` parameter in `AppError` is now optional (defaults to `"CUSTOM_ERROR"`), making it faster to throw simple custom errors.
+- **String Throw Support**: `createAppError` now correctly maps string-based throws (e.g., `throw "Unauthorized"`) to standard error responses.
+
+### Changed
+- **Performance**: Optimized `ResponseBuilder` and removed legacy codebase artifacts for better maintainability.
+
 ## [1.1.1] - 22nd February, 2026
 ### Added
 - Custom Error Adapters: You can now plug in custom logic to handle errors from any library (Prisma, Postgres, etc.) without touching the core code.

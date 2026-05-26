@@ -1,6 +1,6 @@
 // src/core/errors.ts
 
-import mongoose from "mongoose";
+import type mongoose from "mongoose";
 import { ErrorDetails } from "./types";
 import { ErrorAdapter } from "./types";
 import { internalLogger } from '../utils/logger';
@@ -18,7 +18,7 @@ export class AppError extends Error {
   constructor(
     message: string,
     statusCode: number,
-    code: string,
+    code: string = "CUSTOM_ERROR",
     details?: ErrorDetails | ErrorDetails[],
     isOperational = true
   ) {
@@ -221,6 +221,14 @@ export class MongooseGeneralError extends AppError {
 /* -------------------------------------------------------------------------- */
 
 export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): AppError {
+  const appError = _createAppError(err, customAdapters);
+  if (err instanceof Error && !(err instanceof AppError) && err.stack) {
+    appError.stack = err.stack;
+  }
+  return appError;
+}
+
+function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): AppError {
   /* -------------------------- CUSTOM ADAPTERS ------------------------- */
   // Give priority to user-defined adapters
   // for (const adapter of customAdapters) {
@@ -303,14 +311,13 @@ export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []
 
   // 1. Validation Error
   if (
-    err instanceof mongoose.Error.ValidationError ||
     errName === "ValidationError"
   ) {
     return new MongooseValidationError(err as mongoose.Error.ValidationError);
   }
 
   // 2. Cast Error (Invalid ID)
-  if (err instanceof mongoose.Error.CastError || errName === "CastError") {
+  if (errName === "CastError") {
     return new MongooseCastError(err as mongoose.Error.CastError);
   }
 
@@ -318,33 +325,22 @@ export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []
   // We check .code specifically because the name can vary, but 11000 is constant
   if (
     errCode === 11000 ||
-    (errName === "MongoServerError" && errCode === 11000) ||
-    (err instanceof mongoose.mongo.MongoServerError && errCode === 11000)
+    (errName === "MongoServerError" && errCode === 11000)
   ) {
     return new MongooseDuplicateKeyError(
-      err as mongoose.mongo.MongoServerError & { code: number; keyValue?: any }
+      err as any
     );
   }
 
   if (
-    err instanceof mongoose.Error.MongooseServerSelectionError ||
     errName === "MongooseServerSelectionError"
   ) {
     return new DatabaseError();
   }
-
-  if (err instanceof mongoose.Error) {
-    return new MongooseGeneralError(err);
-  }
-
-  /* --------------------------- JS RUNTIME -------------------------------- */
-
-  if (
-    err instanceof TypeError ||
-    err instanceof ReferenceError ||
-    err instanceof SyntaxError
-  ) {
-    return new BadRequestError(err.message);
+ 
+  // Generic Mongoose Error (fallback)
+  if (errName?.startsWith("Mongoose") || (err as any)?._isMongooseError) {
+    return new MongooseGeneralError(err as any);
   }
 
   /* -------------------------- UNKNOWN ERROR ------------------------------- */
@@ -357,6 +353,15 @@ export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []
       undefined,
       false // non-operational (programmer bug)
     );
+  }
+
+  // Handle strings or objects thrown directly
+  if (typeof err === "string") {
+    return new AppError(err, 500, "INTERNAL_ERROR", undefined, false);
+  }
+
+  if (typeof err === "object" && err !== null && (err as any).message) {
+    return new AppError((err as any).message, 500, "INTERNAL_ERROR", undefined, false);
   }
 
   return new AppError(

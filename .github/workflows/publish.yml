@@ -2,23 +2,30 @@ name: Publish to NPM
 
 on:
   push:
-    tags:
-      - 'v*' # Triggers only when a tag starting with 'v' is pushed (e.g., v1.0.2)
+    branches:
+      - main
+    paths:
+      - 'package.json'  # Only run when version changes
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write # Required for provenance
+      contents: write
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm ci
@@ -29,10 +36,24 @@ jobs:
       - name: Run Build
         run: npm run build
 
-      - name: Check if dist exists
-        run: ls -R dist # This will show the files in the logs so you can verify them
-          
+      - name: Check if version already published
+        run: |
+          VERSION=$(npm pkg get version --workspaces=false | tr -d '"')
+          if npm view express-unified-response@$VERSION > /dev/null 2>&1; then
+            echo "Version $VERSION already published. Skipping publish."
+            exit 0
+          fi
+
       - name: Publish to NPM
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Configure Git for Tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and Push Git Tag
+        run: |
+          VERSION=$(npm pkg get version --workspaces=false | tr -d '"')
+          git tag v$VERSION
+          git push origin v$VERSION
