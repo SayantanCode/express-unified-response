@@ -75,7 +75,13 @@ jobs:
           echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --loglevel verbose
+
+      - name: Print npm debug log
+        if: failure()
+        run: |
+          echo "===== NPM DEBUG LOG ====="
+          cat /home/runner/.npm/_logs/*.log || true
 
       - name: Commit version bump
         run: |
