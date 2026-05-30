@@ -73,17 +73,17 @@ jobs:
         run: |
           echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           
-      - name: Check npmrc
-        run: |
-          cat ~/.npmrc || echo "no home npmrc"
-          cat /home/runner/work/_temp/.npmrc || echo "no temp npmrc"
-          echo "---"
-          npm config list
+      # - name: Check npmrc
+      #   run: |
+      #     cat ~/.npmrc || echo "no home npmrc"
+      #     cat /home/runner/work/_temp/.npmrc || echo "no temp npmrc"
+      #     echo "---"
+      #     npm config list
 
-      - name: Debug auth
-        run: | 
-          npm whoami
-          echo "registry: $(npm config get registry)"
+      # - name: Debug auth
+      #   run: | 
+      #     npm whoami
+      #     echo "registry: $(npm config get registry)"
         
       - name: Publish to npm
         run: npm publish --access public --provenance --loglevel verbose
