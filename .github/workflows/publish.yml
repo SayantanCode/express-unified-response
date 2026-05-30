@@ -73,7 +73,10 @@ jobs:
         id: version
         run: |
           echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
+          
+      - name: Check npmrc
+        run: cat ~/.npmrc || echo "no npmrc"
+        
       - name: Publish to npm
         run: npm publish --access public --provenance --loglevel verbose
 
