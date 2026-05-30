@@ -87,9 +87,10 @@ jobs:
       #     echo "registry: $(npm config get registry)"
         
       - name: Publish to npm
-        run: npm publish --access public --provenance --loglevel verbose
-        env:
-          NODE_AUTH_TOKEN: ""
+        run: |
+          npm config set //registry.npmjs.org/:_authToken $(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm" | jq -r '.value')
+          npm publish --access public --provenance --loglevel verbose
+
 
       - name: Print npm debug log
         if: failure()
