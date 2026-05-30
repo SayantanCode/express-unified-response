@@ -75,7 +75,11 @@ jobs:
           echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           
       - name: Check npmrc
-        run: cat ~/.npmrc || echo "no npmrc"
+        run: |
+          cat ~/.npmrc || echo "no home npmrc"
+          cat /home/runner/work/_temp/.npmrc || echo "no temp npmrc"
+          echo "---"
+          npm config list
 
       - name: Debug auth
         run: | 
