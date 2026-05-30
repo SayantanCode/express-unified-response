@@ -76,6 +76,11 @@ jobs:
           
       - name: Check npmrc
         run: cat ~/.npmrc || echo "no npmrc"
+
+      - name: Debug auth
+        run: | 
+          npm whoami
+          echo "registry: $(npm config get registry)"
         
       - name: Publish to npm
         run: npm publish --access public --provenance --loglevel verbose
