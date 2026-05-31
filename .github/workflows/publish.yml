@@ -66,37 +66,14 @@ jobs:
           echo "type=$BUMP_TYPE" >> $GITHUB_OUTPUT
 
       - name: Bump package version
-        run: |
-          npm version ${{ steps.bump.outputs.type }} --no-git-tag-version
+        run: npm version ${{ steps.bump.outputs.type }} --no-git-tag-version
 
       - name: Read new version
         id: version
-        run: |
-          echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-          
-      # - name: Check npmrc
-      #   run: |
-      #     cat ~/.npmrc || echo "no home npmrc"
-      #     cat /home/runner/work/_temp/.npmrc || echo "no temp npmrc"
-      #     echo "---"
-      #     npm config list
+        run: echo "next=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      # - name: Debug auth
-      #   run: | 
-      #     npm whoami
-      #     echo "registry: $(npm config get registry)"
-
-      - name: Debug OIDC token
-        run: |
-          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm" | jq -r '.value')
-          echo "Token payload:"
-          echo $TOKEN | cut -d'.' -f2 | base64 -d 2>/dev/null | jq .
-        
       - name: Publish to npm
-        run: |
-          npm config set //registry.npmjs.org/:_authToken $(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm" | jq -r '.value')
-          npm publish --access public --provenance --loglevel verbose
-
+        run: npm publish --access public --provenance --loglevel verbose
 
       - name: Print npm debug log
         if: failure()
@@ -110,8 +87,7 @@ jobs:
           git commit -m "chore(release): v${{ steps.version.outputs.next }} [skip ci]"
 
       - name: Create git tag
-        run: |
-          git tag v${{ steps.version.outputs.next }}
+        run: git tag v${{ steps.version.outputs.next }}
 
       - name: Push changes and tags
         run: |

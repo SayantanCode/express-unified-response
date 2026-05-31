@@ -545,10 +545,17 @@ export class Paginator {
     
     const totalDocs = items.length;
     
-    // Actually slice the array if pagination is requested
-    const resultItems = isPaginated 
-      ? items.slice(skip, skip + limit) 
-      : items;
+    // Enforce nonPaginatedMaxItems limit when pagination is disabled
+    let resultItems: T[];
+    if (!isPaginated && this.paginationDefaults.maxLimit) {
+      // When not paginating, limit to maxLimit items to prevent DoS
+      resultItems = items.slice(0, this.paginationDefaults.maxLimit);
+    } else {
+      // When paginating, slice normally
+      resultItems = isPaginated 
+        ? items.slice(skip, skip + limit) 
+        : items;
+    }
 
     const resultDocs = options.transform 
       ? resultItems.map(options.transform) 

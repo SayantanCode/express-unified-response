@@ -27,3 +27,4 @@ export {
 } from "./core/errors";
 
 export { asyncHandler } from "./utils/asyncHandler";
+export { filterStackTrace, safeStringify } from "./utils/stackTraceFilter";
