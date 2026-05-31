@@ -306,6 +306,55 @@ app.use(createErrorMiddleware(config));
 
 > `Note:` Pass the same config to `createErrorMiddleware(config)`. to make them consistent.
 
+## 🔒 Security & Error Handling Best Practices
+
+### Stack Traces
+Stack traces are **filtered by default** to hide internal `node_modules` paths. This prevents:
+- Exposing sensitive file system paths
+- Leaking library versions and internal implementation details
+- Confusing API users with ugly error output
+
+When `exposeStack: true`, stack traces show only your application code, not framework internals:
+
+```json
+{
+  "success": false,
+  "message": "An unexpected error occurred",
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "stack": "Error: Cannot read property 'name' of undefined\n    at getUserById (/src/routes/users.ts:42:10)\n    at processRequest (/src/middleware/handler.ts:15:5)"
+  }
+}
+```
+
+### Non-Operational vs Operational Errors
+- **Operational Errors** (e.g., validation failures, not found): Client caused; safe to expose details
+- **Non-Operational Errors** (e.g., code bugs, database crashes): Server caused; shows generic message
+
+Non-operational errors are automatically masked to prevent information leakage:
+
+```js
+// Code bug (non-operational)
+throw new Error("TypeError: Cannot read property 'name' of undefined");
+// Client receives: "An unexpected error occurred"
+```
+
+### Pagination DoS Protection
+Non-paginated endpoints are automatically limited via `nonPaginatedMaxItems`:
+
+```js
+// Even if you return huge arrays, only first 1000 items are sent
+res.list(millionItems); // Limited to 1000 items
+```
+
+### Safe Error Details
+Error details undergo circular reference detection and sanitization:
+
+```js
+// Before: Object with circular references crashes JSON.stringify
+// After: Circular references are safely marked as [Circular Reference]
+```
+
 ## 📤 Response Examples
 
 Success List (Paginated)

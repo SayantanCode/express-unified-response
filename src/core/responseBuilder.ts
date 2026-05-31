@@ -6,6 +6,7 @@ import { AppError, createAppError } from "./errors";
 import { PaginatedResult } from "./types";
 import { TransformFn } from "./paginator";
 import { ErrorAdapter } from "./types";
+import { filterStackTrace, safeStringify } from "../utils/stackTraceFilter";
 
 /**
  * Central builder for all success, paginated, list and error responses.
@@ -25,7 +26,7 @@ export class ResponseBuilder {
    */
   private applyTransform<T, R>(
     data: T | T[],
-    transform?: TransformFn<T, R>
+    transform?: TransformFn<T, R>,
   ): T | R | R[] {
     if (transform) {
       return Array.isArray(data)
@@ -35,10 +36,7 @@ export class ResponseBuilder {
     return data as T | R | R[];
   }
 
-  private baseSuccess<T>(
-    data: T,
-    message?: string
-  ) {
+  private baseSuccess<T>(data: T, message?: string) {
     const { successKey, dataKey, messageKey } = this.config.keys;
 
     return {
@@ -60,9 +58,9 @@ export class ResponseBuilder {
    * Handles the metadata block and transformation.
    */
   list<T, R = T>(
-    result: PaginatedResult<T>, 
+    result: PaginatedResult<T>,
     message?: string,
-    options?: { transform?: TransformFn<T, R>; silent?: boolean }
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
 
@@ -89,7 +87,7 @@ export class ResponseBuilder {
       body: {
         [successKey]: true,
         [dataKey]: finalDocs,
-        [metaKey]: meta, 
+        [metaKey]: meta,
         ...(message ? { [messageKey]: message } : {}),
       },
       shouldLog: this.shouldLog({ silent }),
@@ -101,7 +99,7 @@ export class ResponseBuilder {
   success<T, R = T>(
     data: T,
     message?: string,
-    options?: { transform?: TransformFn<T, R>; silent?: boolean }
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
     let processedData = data;
@@ -124,7 +122,7 @@ export class ResponseBuilder {
   created<T, R = T>(
     data: T,
     message?: string,
-    options?: { transform?: TransformFn<T, R>; silent?: boolean }
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
     const finalData = this.applyTransform(data, transform);
@@ -145,7 +143,7 @@ export class ResponseBuilder {
   updated<T, R = T>(
     data?: T,
     message?: string,
-    options?: { transform?: TransformFn<T, R>; silent?: boolean }
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
 
@@ -167,7 +165,7 @@ export class ResponseBuilder {
 
       return {
         statusCode: 200,
-        body: this.baseSuccess(finalData, message), 
+        body: this.baseSuccess(finalData, message),
         shouldLog: this.shouldLog({ silent }),
       };
     }
@@ -189,7 +187,7 @@ export class ResponseBuilder {
   deleted(
     data?: any,
     message?: string,
-    options?: { silent?: boolean }
+    options?: { silent?: boolean },
   ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
     const { silent } = options || {};
 
@@ -226,7 +224,7 @@ export class ResponseBuilder {
   paginated<T, R = T>(
     result: PaginatedResult<T>,
     message?: string,
-    options?: { transform?: TransformFn<T, R>; silent?: boolean }
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
 
@@ -260,7 +258,7 @@ export class ResponseBuilder {
    */
   apperror(
     err: unknown,
-    options?: { silent?: boolean, adapters?: ErrorAdapter[] }
+    options?: { silent?: boolean; adapters?: ErrorAdapter[] },
   ): {
     statusCode: number;
     body: Record<string, any>;
@@ -269,23 +267,33 @@ export class ResponseBuilder {
   } {
     const { silent, adapters: methodAdapters } = options || {};
     // Merge adapters: Method-level adapters come first, then global config adapters
-  const globalAdapters = this.config.adapters || [];
-  const combinedAdapters = [...(methodAdapters || []), ...globalAdapters];
+    const globalAdapters = this.config.adapters || [];
+    const combinedAdapters = [...(methodAdapters || []), ...globalAdapters];
     const appErr: AppError = createAppError(err, combinedAdapters);
     const { keys, error } = this.config;
     const { errorKey, messageKey, successKey } = keys;
 
+    // For non-operational errors (programmer bugs), use a generic message
+    const message =
+      !appErr.isOperational && this.config.error.defaultErrorMessage
+        ? this.config.error.defaultErrorMessage
+        : appErr.message;
+
     const body: Record<string, any> = {
       [successKey]: false,
-      [messageKey]: appErr.message,
+      [messageKey]: message,
       [errorKey]: {
         code: appErr.code,
-        ...(appErr.details ? { details: appErr.details } : {}),
+        ...(appErr.details ? { details: safeStringify(appErr.details) } : {}),
       },
     };
 
     if (error.exposeErrorName && appErr.name) body[errorKey].name = appErr.name;
-    if (error.exposeStack && appErr.stack) body[errorKey].stack = appErr.stack;
+
+    // Filter stack trace to hide node_modules and internal paths
+    if (error.exposeStack && appErr.stack) {
+      body[errorKey].stack = filterStackTrace(appErr.stack);
+    }
 
     return {
       statusCode: appErr.statusCode,

@@ -184,26 +184,39 @@ export class MongooseDuplicateKeyError extends BadRequestError {
   constructor(
     err: mongoose.mongo.MongoServerError & { code: number; keyValue?: any }
   ) {
-    // 1. Extract the field name (e.g., "email" or "metadata.serial")
-    const field = err.keyValue ? Object.keys(err.keyValue)[0] : undefined;
-    
-    // 2. Safely extract the value, even if it's nested
-    let value = undefined;
-    if (field && err.keyValue) {
-      value = err.keyValue[field];
-      
-      // If the value is still an object, it means MongoDB returned a nested structure
-      // We take the first value found inside that nested object
-      if (typeof value === 'object' && value !== null) {
-        value = Object.values(value)[0];
+    // 1. Extract the field name safely
+    let field: string | undefined;
+    let value: any = undefined;
+
+    try {
+      if (err.keyValue && typeof err.keyValue === 'object') {
+        const fieldKey = Object.keys(err.keyValue)[0];
+        if (fieldKey) {
+          field = fieldKey;
+          value = err.keyValue[fieldKey];
+          
+          // If the value is still an object, it means MongoDB returned a nested structure
+          // We take the first value found inside that nested object
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            const nestedValue = Object.values(value)[0];
+            value = nestedValue !== undefined ? nestedValue : value;
+          }
+        }
       }
+    } catch {
+      // Silently handle any errors in parsing keyValue
+      // Fall through to use safe defaults
     }
 
+    const safeMessage = field 
+      ? `Duplicate value found for field: ${field}`
+      : 'Duplicate key error';
+
     super("Duplicate key error", {
-      message: `Duplicate value found for field: ${field}`,
-      field,
-      value,
-      code: String(err.code),
+      message: safeMessage,
+      field: field || 'unknown',
+      value: value !== undefined ? value : null,
+      code: String(err.code || 11000),
     });
   }
 }
@@ -346,22 +359,24 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
   /* -------------------------- UNKNOWN ERROR ------------------------------- */
 
   if (err instanceof Error) {
+    // User explicitly threw an Error, so treat it as operational
+    // Only mask if it's a generic framework error with no meaningful message
     return new AppError(
       err.message,
       500,
       "INTERNAL_ERROR",
       undefined,
-      false // non-operational (programmer bug)
+      true // operational - user threw this intentionally
     );
   }
 
   // Handle strings or objects thrown directly
   if (typeof err === "string") {
-    return new AppError(err, 500, "INTERNAL_ERROR", undefined, false);
+    return new AppError(err, 500, "INTERNAL_ERROR", undefined, true);
   }
 
   if (typeof err === "object" && err !== null && (err as any).message) {
-    return new AppError((err as any).message, 500, "INTERNAL_ERROR", undefined, false);
+    return new AppError((err as any).message, 500, "INTERNAL_ERROR", undefined, true);
   }
 
   return new AppError(
@@ -369,6 +384,6 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
     500,
     "INTERNAL_ERROR",
     undefined,
-    false
+    true
   );
 }

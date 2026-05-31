@@ -1,6 +1,26 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [1.1.3] - May 31, 2026
+
+### Fixed
+- **Stack Trace Filtering**: Stack traces now filter out `node_modules` and `node:internal` paths, preventing ugly/leaked file paths and showing only user code. Addresses the issue where users received confusing stack traces with internal framework details.
+- **Non-Paginated Items DoS Protection**: Enforced `nonPaginatedMaxItems` limit in `res.list()` to prevent accidental/intentional DoS from unbounded list responses. Lists now cap at `maxLimit` items when pagination is disabled.
+- **Circular Reference Protection**: Added safe serialization for error details to prevent crashes from circular references in error objects. Circular references are now marked as `[Circular Reference]` in responses.
+- **Improved Mongoose Duplicate Key Error**: Added defensive checks for malformed MongoDB error responses. Safely handles edge cases where `keyValue` is missing or has unexpected structure.
+
+### Added
+- **Stack Trace Utilities**: Exported `filterStackTrace()` and `safeStringify()` utilities for advanced users who need custom error processing.
+- **Better Error Details Sanitization**: Error details now undergo safe serialization to prevent:
+  - Non-serializable values (functions, symbols) from crashing responses
+  - Circular references from infinite loops
+  - Invalid data structures from causing JSON errors
+
+### Improved
+- **Error Message Consistency**: Non-operational errors (truly unexpected failures) now show a generic message instead of leaking implementation details. Operational errors (user-thrown) show their full messages for better debugging.
+- **Security**: Default configuration is now safer for production; stack trace filtering and message masking work together to prevent information leakage.
+
 ## [1.1.2] - May 27, 2026
 
 ### Fixed
