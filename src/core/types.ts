@@ -20,4 +20,11 @@ export interface PaginatedResult<T> {
   prevPage: number | null;
 }
 
+export interface CursorPaginatedResult<T> {
+  docs: T[];
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  limit: number;
+}
+
 export type ErrorAdapter = (err: unknown) => AppError | null;

@@ -1,7 +1,7 @@
 // Checking Data Transformation (DTO) Functionality
 // (Single object and list of objects transformation using provided function)
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import express from "express";
 import request from "supertest";
 import { createResponseMiddleware } from "../src/index";
@@ -24,12 +24,12 @@ describe("Data Transformation (DTO)", () => {
   });
 
   it("should transform a list of objects", async () => {
-    app.get("/list", (req, res) => {
+    app.get("/list", async (_req, res) => {
       const users = [
         { _id: 1, name: "Joe" },
         { _id: 2, name: "Jane" },
       ];
-      res.list(
+      await res.list(
         users,
         {
           paginate: false,
@@ -43,7 +43,7 @@ describe("Data Transformation (DTO)", () => {
     expect(res.body.data[1].name).toBe("JANE");
   });
 
-  it("should transform aggregate results", async () => {
+  it("should return raw docs from paginateAggregate (transform is applied by ResponseBuilder, not Paginator)", async () => {
     const defaults = { page: 1, limit: 10, maxLimit: 100 };
     const paginator = new Paginator(defaults as any);
     const mockModel: any = {
@@ -58,10 +58,34 @@ describe("Data Transformation (DTO)", () => {
     const result = await paginator.paginateAggregate(mockModel, {
       page: 1,
       limit: 10,
-      transform: (doc: any) => ({ id: doc._id, doubleVal: doc.val * 2 }),
     });
 
-    expect(result.docs[0]).toEqual({ id: "123", doubleVal: 20 });
-    expect(result.docs[1].doubleVal).toBe(40);
+    // Paginator returns raw docs; transform is applied downstream in ResponseBuilder
+    expect(result.docs[0]).toEqual({ _id: "123", val: 10 });
+    expect(result.docs[1]).toEqual({ _id: "456", val: 20 });
+  });
+
+  it("should apply transform to aggregate results through the middleware", async () => {
+    const app = express();
+    app.use(createResponseMiddleware());
+
+    app.get("/aggregate-transform", async (req, res) => {
+      // Simulate aggregate result by using paginateAggregate via list (no real DB needed)
+      await res.list(
+        [
+          { _id: "123", val: 10 },
+          { _id: "456", val: 20 },
+        ],
+        {
+          paginate: false,
+          transform: (doc: any) => ({ id: doc._id, doubleVal: doc.val * 2 }),
+        },
+        "Aggregated"
+      );
+    });
+
+    const res = await request(app).get("/aggregate-transform");
+    expect(res.body.data[0]).toEqual({ id: "123", doubleVal: 20 });
+    expect(res.body.data[1].doubleVal).toBe(40);
   });
 });

@@ -12,6 +12,10 @@
       "require": "./dist/index.js"
     }
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
   "files": [
     "dist",
     "README.md",

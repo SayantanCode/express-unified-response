@@ -9,12 +9,27 @@ import { internalLogger } from '../utils/logger';
 /*                                   BASE                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Base error class for all application errors. Throw directly for one-off cases
+ * or extend for domain-specific error types.
+ *
+ * @example
+ * throw new AppError("Seat already taken", 409, "SEAT_CONFLICT");
+ * throw new AppError("Rate limit", 429, "RATE_LIMIT", { retryAfter: 60 });
+ */
 export class AppError extends Error {
   public statusCode: number;
   public code: string;
   public details?: ErrorDetails | ErrorDetails[];
   public isOperational: boolean;
 
+  /**
+   * @param message - Human-readable message shown to API clients (when operational)
+   * @param statusCode - HTTP status code (e.g. 400, 404, 500)
+   * @param code - Machine-readable error code included in the response (default: "CUSTOM_ERROR")
+   * @param details - Optional structured context — single object or array for field-level errors
+   * @param isOperational - `true` (default) = show message to client; `false` = show defaultErrorMessage
+   */
   constructor(
     message: string,
     statusCode: number,
@@ -215,7 +230,6 @@ export class MongooseDuplicateKeyError extends BadRequestError {
     super("Duplicate key error", {
       message: safeMessage,
       field: field || 'unknown',
-      value: value !== undefined ? value : null,
       code: String(err.code || 11000),
     });
   }
@@ -233,41 +247,39 @@ export class MongooseGeneralError extends AppError {
 /*                               ERROR FACTORY                                 */
 /* -------------------------------------------------------------------------- */
 
-export function createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): AppError {
-  const appError = _createAppError(err, customAdapters);
+export function createAppError(
+  err: unknown,
+  customAdapters: ErrorAdapter[] = [],
+  onWarn?: (message: string, context?: unknown) => void
+): AppError {
+  const appError = _createAppError(err, customAdapters, onWarn);
   if (err instanceof Error && !(err instanceof AppError) && err.stack) {
     appError.stack = err.stack;
   }
   return appError;
 }
 
-function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): AppError {
+function _createAppError(
+  err: unknown,
+  customAdapters: ErrorAdapter[] = [],
+  onWarn?: (message: string, context?: unknown) => void
+): AppError {
   /* -------------------------- CUSTOM ADAPTERS ------------------------- */
-  // Give priority to user-defined adapters
-  // for (const adapter of customAdapters) {
-  //   const result = adapter(err);
-  //   if (result instanceof AppError) return result;
-  // }
   if (Array.isArray(customAdapters)) {
     for (const [index, adapter] of customAdapters.entries()) {
       try {
-        // Skip if adapter isn't a function (safety for JS users)
         if (typeof adapter !== 'function') continue;
-
         const result = adapter(err);
-        
-        // Only return if the adapter actually returned an AppError instance
         if (result instanceof AppError) return result;
       } catch (adapterError) {
-        /**
-         * SAFETY SHIELD: 
-         * If a user's custom adapter crashes, we catch it here.
-         * We log it so the developer knows their adapter is broken,
-         * but we don't let it crash the whole request.
-         */
-        internalLogger.adapterError(`Adapter at index ${index}`, adapterError);
-        // Continue to the next adapter or built-in logic
-        continue; 
+        // Adapter crashed — log it but don't let it kill the request.
+        // Routes through the user's onWarn if configured, otherwise falls back to internalLogger.
+        if (onWarn) {
+          onWarn(`Adapter at index ${index} threw an exception`, adapterError);
+        } else {
+          internalLogger.adapterError(`Adapter at index ${index}`, adapterError);
+        }
+        continue;
       }
     }
   }
@@ -275,25 +287,35 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
   /* ------------------------------BUILT-IN LOGIC APP ERRORS ----------------------------- */
   if (err instanceof AppError) return err;
 
+  // Hoist name/code so all checks below can share them
+  const errName = (err as any)?.name;
+  const errCode = (err as any)?.code;
+
   /* ---------------------------- AUTH / TOKENS ---------------------------- */
 
-  if (typeof err === "object" && err !== null && "name" in err) {
-    if ((err as any).name === "TokenExpiredError") {
-      return new TokenExpiredError();
-    }
+  if (errName === "TokenExpiredError") return new TokenExpiredError();
+  if (errName === "JsonWebTokenError") return new InvalidTokenError();
 
-    if ((err as any).name === "JsonWebTokenError") {
-      return new InvalidTokenError();
-    }
+  /* -------------------------------- ZOD --------------------------------- */
+
+  if (errName === "ZodError" && Array.isArray((err as any).issues)) {
+    const details: ErrorDetails[] = (err as any).issues.map((issue: any) => ({
+      field: Array.isArray(issue.path) && issue.path.length > 0
+        ? issue.path.join(".")
+        : "unknown",
+      message: issue.message,
+      code: issue.code,
+    }));
+    return new ValidationError("Validation failed", details);
   }
 
   /* ------------------------------ MULTER -------------------------------- */
 
-  if ((err as any)?.code === "LIMIT_FILE_SIZE") {
+  if (errCode === "LIMIT_FILE_SIZE") {
     return new FileUploadError("File size limit exceeded");
   }
 
-  if ((err as any)?.code === "LIMIT_UNEXPECTED_FILE") {
+  if (errCode === "LIMIT_UNEXPECTED_FILE") {
     return new FileUploadError("Unexpected file field");
   }
 
@@ -317,14 +339,15 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
   }
 
   /* ----------------------------- MONGOOSE -------------------------------- */
-  // This part might need to be more robust based on how mongoose errors are structured. Leave for later
-  /* ----------------------------- MONGOOSE -------------------------------- */
-  const errName = (err as any)?.name;
-  const errCode = (err as any)?.code;
 
-  // 1. Validation Error
+  // 1. Validation Error — guard with Mongoose-specific structure to avoid collisions
+  // with Joi, class-validator, Zod, etc. that also use the name "ValidationError"
   if (
-    errName === "ValidationError"
+    errName === "ValidationError" &&
+    typeof (err as any).errors === "object" &&
+    (err as any).errors !== null &&
+    // Mongoose ValidationError has a _message string and per-field error objects
+    typeof (err as any)._message === "string"
   ) {
     return new MongooseValidationError(err as mongoose.Error.ValidationError);
   }
@@ -359,18 +382,20 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
   /* -------------------------- UNKNOWN ERROR ------------------------------- */
 
   if (err instanceof Error) {
-    // User explicitly threw an Error, so treat it as operational
-    // Only mask if it's a generic framework error with no meaningful message
+    // Distinguish intentional throws from runtime programmer bugs.
+    // `new Error("msg")` has name === "Error" — treat as operational (show message).
+    // `TypeError`, `RangeError`, `ReferenceError`, etc. have specific names — mask them.
+    const isIntentional = err.name === "Error";
     return new AppError(
       err.message,
       500,
       "INTERNAL_ERROR",
       undefined,
-      true // operational - user threw this intentionally
+      isIntentional
     );
   }
 
-  // Handle strings or objects thrown directly
+  // Handle strings or objects thrown directly — these are intentional throws
   if (typeof err === "string") {
     return new AppError(err, 500, "INTERNAL_ERROR", undefined, true);
   }
@@ -384,6 +409,6 @@ function _createAppError(err: unknown, customAdapters: ErrorAdapter[] = []): App
     500,
     "INTERNAL_ERROR",
     undefined,
-    true
+    false
   );
 }

@@ -1,0 +1,14 @@
+{
+  "name": "01-basic-rest-api",
+  "version": "1.0.0",
+  "description": "Core response helpers, error classes, asyncHandler, and custom logger",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^5.0.0",
+    "express-unified-response": "^1.1.2"
+  }
+}

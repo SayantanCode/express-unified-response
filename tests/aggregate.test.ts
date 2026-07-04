@@ -34,9 +34,9 @@ describe('Paginator.paginateAggregate', () => {
     const calls = mockModel.aggregate.mock.calls;
     
     // The first call (or one of them) should be the data pipeline with $skip/$limit
-    const dataPipeline = calls.find((call: any[][]) => 
-      call[0].some((stage: any) => stage.$skip === 5)
-    )[0];
+    const dataPipeline = calls.find((call: any[][]) =>
+      call[0]!.some((stage: any) => stage.$skip === 5)
+    )![0]!;
 
     expect(dataPipeline).toContainEqual({ $skip: 5 });
     expect(dataPipeline).toContainEqual({ $limit: 5 });

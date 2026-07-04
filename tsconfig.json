@@ -15,7 +15,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts", "eslint.config.mjs"],
   "exclude": ["node_modules", "dist"]
