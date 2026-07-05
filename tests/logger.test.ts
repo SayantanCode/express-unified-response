@@ -6,7 +6,7 @@
 //   - onWarn callback    → receives package warning (useEstimatedCount + filter conflict)
 //   - partial logger override → shallow-merge keeps unset callbacks as defaults
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import request from "supertest";
 import {
@@ -193,5 +193,104 @@ describe('logger shallow merge', () => {
     // Error route should still return a proper response (default onError wired)
     const errRes = await request(app).get("/err");
     expect(errRes.status).toBe(404);
+  });
+});
+
+// ─── dev diagnostic — missing createResponseMiddleware ───────────────────────
+
+describe('createErrorMiddleware — missing createResponseMiddleware diagnostic', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('warns via onWarn when createErrorMiddleware is used without createResponseMiddleware', async () => {
+    process.env.NODE_ENV = 'development';
+    const onWarn = vi.fn();
+
+    const app = express();
+    // No createResponseMiddleware() registered at all
+    app.get('/err', (_req, _res) => { throw new Error('boom'); });
+    app.use(createErrorMiddleware({ logger: { onWarn } }));
+
+    const res = await request(app).get('/err');
+
+    expect(res.status).toBe(500); // error handling itself still works correctly
+    expect(onWarn).toHaveBeenCalledOnce();
+    const [message] = onWarn.mock.calls[0]!;
+    expect(message).toMatch(/res\.success/i);
+    expect(message).toMatch(/createResponseMiddleware/);
+  });
+
+  it('warns when createErrorMiddleware is registered before createResponseMiddleware', async () => {
+    process.env.NODE_ENV = 'development';
+    const onWarn = vi.fn();
+
+    const app = express();
+    // Wrong order: error middleware registered first
+    app.use(createErrorMiddleware({ logger: { onWarn } }));
+    app.use(createResponseMiddleware());
+    app.get('/ok', (_req, res) => { res.success({ ok: true }); });
+
+    await request(app).get('/ok');
+
+    // Every request hits the error middleware's own 404 catch-all before
+    // createResponseMiddleware ever runs, so the diagnostic should fire.
+    expect(onWarn).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT warn when set up correctly', async () => {
+    process.env.NODE_ENV = 'development';
+    const onWarn = vi.fn();
+    const app = buildApp({ logger: { onWarn } });
+
+    await request(app).get('/ok');
+    await request(app).get('/err');
+
+    expect(onWarn).not.toHaveBeenCalled();
+  });
+
+  it('does NOT warn in production, even when misconfigured', async () => {
+    process.env.NODE_ENV = 'production';
+    const onWarn = vi.fn();
+
+    const app = express();
+    app.get('/err', (_req, _res) => { throw new Error('boom'); });
+    app.use(createErrorMiddleware({ logger: { onWarn } }));
+
+    await request(app).get('/err');
+
+    expect(onWarn).not.toHaveBeenCalled();
+  });
+
+  it('only warns once per middleware instance, not once per request', async () => {
+    process.env.NODE_ENV = 'development';
+    const onWarn = vi.fn();
+
+    const app = express();
+    app.get('/err', (_req, _res) => { throw new Error('boom'); });
+    app.use(createErrorMiddleware({ logger: { onWarn } }));
+
+    await request(app).get('/err');
+    await request(app).get('/err');
+    await request(app).get('/err');
+
+    expect(onWarn).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to console.warn (internalLogger) when onWarn is not configured', async () => {
+    process.env.NODE_ENV = 'development';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const app = express();
+    app.get('/err', (_req, _res) => { throw new Error('boom'); });
+    app.use(createErrorMiddleware());
+
+    const res = await request(app).get('/err');
+
+    expect(res.status).toBe(500);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

@@ -117,6 +117,7 @@ app.use(createErrorMiddleware());
 - [Logging Integration](#-logging-integration-morgan-winston--cloudwatch)
 - [express-rate-limit](#-express-rate-limit-integration)
 - [Using Without Mongoose](#-using-without-mongoose-prisma-typeorm-drizzle-pg)
+- [Using Error Classes Outside Express](#-using-error-classes-outside-express-cron-jobs-queues-cli-scripts)
 - [Custom Error Adapters](#custom-error-adapters)
 - [Common Mistakes](#-common-mistakes)
 - [FAQ & Gotchas](#-faq--gotchas)
@@ -852,6 +853,37 @@ app.get("/posts", asyncHandler(async (req, res) => {
 ORM-specific errors (Prisma `P2002`, TypeORM `QueryFailedError`, pg `23505`) are not auto-handled. Register a custom adapter — see [Custom Error Adapters](#custom-error-adapters) below.
 
 Without an adapter, ORM errors that are not `AppError` subclasses fall through to the generic handler. Since they are named errors (e.g. `PrismaClientKnownRequestError`), they are treated as non-operational and the client receives your configured `defaultErrorMessage` instead of the raw ORM message.
+
+---
+
+## 🔁 Using Error Classes Outside Express (Cron Jobs, Queues, CLI Scripts)
+
+`core/` has zero dependency on Express — `AppError`, `createAppError`, and every error
+class are plain, framework-agnostic code. You can use them anywhere you want structured,
+consistent errors, even with no `res` to respond to: BullMQ/Agenda job processors,
+node-cron tasks, CLI scripts, or any background worker.
+
+```js
+// worker.js — a BullMQ job processor, no Express involved
+import { createAppError } from "express-unified-response";
+
+async function processExportJob(job) {
+  try {
+    const user = await User.findById(job.data.userId);
+    if (!user) throw new Error("User not found for export");
+    await generateExport(user);
+  } catch (err) {
+    // Same Mongoose/Zod/etc. normalization the HTTP middleware uses —
+    // useful for consistent structured logging even without a response to send.
+    const appError = createAppError(err);
+    logger.error({ code: appError.code, message: appError.message, jobId: job.id });
+    throw appError; // let the queue's own retry mechanism handle it
+  }
+}
+```
+
+`createResponseMiddleware`/`createErrorMiddleware` are Express-only — everything else in
+`core/` (errors, `createAppError`) works standalone.
 
 ---
 
