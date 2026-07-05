@@ -60,7 +60,7 @@ jobs:
 
           # Matches the commit convention from CONTRIBUTING.md (feat:/fix:/docs:/refactor:/test:/chore:)
           # feat: -> minor, a "!" breaking marker or "BREAKING CHANGE" footer -> major, anything else -> patch
-          if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^(feat|fix)(\([^)]*\))?!:"; then
+          if echo "$COMMITS" | grep -qiE "^BREAKING CHANGE:|^(feat|fix)(\([^)]*\))?!:"; then
             BUMP_TYPE="major"
           elif echo "$COMMITS" | grep -qiE "^feat(\([^)]*\))?:"; then
             BUMP_TYPE="minor"
