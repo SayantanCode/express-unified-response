@@ -59,7 +59,8 @@ const imageFilter = (_req, file, cb) => {
   const allowed = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
   if (allowed.includes(path.extname(file.originalname).toLowerCase()))
     return cb(null, true);
-  cb(new Error("Only image files are allowed"), false);
+  // FileUploadError → 400, not a plain Error (which would mask as a 500)
+  cb(new FileUploadError("Only image files are allowed"), false);
 };
 
 const upload = multer({

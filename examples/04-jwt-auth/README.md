@@ -55,3 +55,4 @@ curl http://localhost:3004/auth/test/invalid
 - `requireAuth` uses `asyncHandler` so `jwt.verify()` errors propagate directly — no try/catch
 - `requireRole` is a higher-order function that returns an `asyncHandler` middleware
 - The same middleware pattern works on any route: `app.get("/route", requireAuth, requireRole("admin"), handler)`
+- **Demo only**: passwords are compared in plaintext against an in-memory array. A real app must hash passwords (e.g. `bcrypt`) and store users in a database — this example only exists to demonstrate JWT error mapping, not authentication security practice.
