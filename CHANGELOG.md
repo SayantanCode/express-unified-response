@@ -26,6 +26,11 @@ All notable changes to this project will be documented in this file.
 - **`QueryOptions` now exposes `select` and `lean`**: These options were accepted by the paginator internally but were absent from the public `QueryOptions` TypeScript type, making them invisible to TS users and IDE autocomplete.
 - **Explicit return type on `createErrorMiddleware`**: Now typed as `[RequestHandler, ErrorRequestHandler]` for better TypeScript integration.
 - **New exported types**: `CursorPaginatedResult`, `CursorOptions`, `CursorPaginationOptions` are now part of the public API.
+- **Dev-mode diagnostic for missing `createResponseMiddleware`**: `createErrorMiddleware` now detects, once per instance and only outside `NODE_ENV=production`, when `res.success`/`created`/etc. aren't present at error-handling time — the two most common setup mistakes (`createResponseMiddleware()` never registered, or registered after `createErrorMiddleware()`/after the routes). Routes through `logger.onWarn` like other package warnings; never changes the actual error response, and explicitly does not flag the supported standalone `createErrorMiddleware()` usage.
+- **`transform` now receives an `index` as its second argument**: `TransformFn<T, R> = (doc, index) => R`. Purely additive — existing single-argument transform functions keep working unchanged, same as `Array.prototype.map`. `index` is always `0` for single-object calls (`res.success`/`created`/`updated`/`deleted`).
+  ```js
+  res.list(users, { transform: (u, i) => ({ position: i, id: u._id, name: u.name }) });
+  ```
 
 ### Fixed
 - **`res.success` silent option ignored**: The `silent` option passed to `res.success()` had no effect because the middleware was internally checking a non-existent `shouldLog` property instead of `silent`. Now consistent with all other response helpers.
@@ -62,6 +67,9 @@ All notable changes to this project will be documented in this file.
   ```
 - **Accurate request duration via `res.once('finish')`**: `durationMs` was previously computed and logged before `res.json()` was called — missing JSON serialization and socket write time. Both `onSuccess` and `onError` now fire from a `res.once('finish')` listener, so the reported time covers the full response pipeline.
 - **Zero-duration fix when `createErrorMiddleware` is used standalone**: Without `createResponseMiddleware`, `req.startTime` was never set, causing every error log to show `0.000 ms`. The fallback now captures time at the point the error handler fires.
+- **Transform errors now pinpoint the failing item**: Previously a failing array transform threw a generic `"Transform function threw: ..."` with no way to tell which item caused it. Each item's transform is now caught individually, so the message includes the failing index and the item's `_id`/`id` if present (e.g. `"Transform function threw at index 42, id: 664f...: ..."`).
+- **`ResponseBuilder.list()`/`.paginated()` deduplicated**: Both built an identical pagination-meta envelope independently; now share one private helper. No output change.
+- **Build produces zero warnings**: The esbuild "ignored side-effect import" warning (from the `express-serve-static-core` type augmentation combined with `sideEffects: false`) is gone — resolved with a lint-safe type-only import instead of a bare side-effect import.
 
 ### Pagination — Performance & Safety
 - **`skipCount` option on `paginateQuery` and `paginateAggregate`**: Pass `skipCount: true` to skip the count query entirely. `totalDocs` and `totalPages` return `-1`. Use for infinite scroll where count is not needed.
@@ -90,8 +98,11 @@ All notable changes to this project will be documented in this file.
 - **`filter`, `sort`, `projection`, `populate` types tightened**: These fields in `QueryOptions` and `CursorOptions` were typed as `any`. Now typed as `Record<string, any>`, `Record<string, 1 | -1 | "asc" | "desc">`, `Record<string, 0 | 1>`, and a union of populate forms respectively. Catches obvious misuse (e.g. `filter: 42`) at compile time while keeping flexibility for complex queries.
 - **README: Prisma and TypeORM adapter examples added**: Full adapter examples for Prisma (`P2002`, `P2025`, `P2003`) and TypeORM added to the Custom Error Adapters section.
 - **SECURITY.md added**: Documents supported versions, vulnerability reporting process, and security considerations.
-- **GitHub issue templates added**: Bug report and feature request templates under `.github/ISSUE_TEMPLATE/`.
-- **59 tests** (up from 42): New test file covering all new pagination features — `skipCount`, `useEstimatedCount`, `lean+populate` guard, cursor `asc`/`desc` direction, `hasNextPage` detection, `Date` cursor serialization, `allowDiskUse`, count pipeline `$limit`/`$skip` stripping, `MongooseDuplicateKeyError` value exposure, and `routeNotFound` behavior.
+- **GitHub issue templates and PR template added**: Bug report and feature request templates under `.github/ISSUE_TEMPLATE/`, plus `.github/PULL_REQUEST_TEMPLATE.md` mirroring the existing CONTRIBUTING.md checklist.
+- **New Common Mistake: relying on a schema's `toJSON` transform to hide sensitive fields**: `res.success`/`created`/`updated`/`deleted` unwrap Mongoose's internal `_doc` directly for convenience, which skips `toJSON`/`toObject` schema transforms and virtuals entirely — verified with a real schema test that a `password` field hidden via a `toJSON` transform was **not** hidden in the actual response. Documented with the two safe alternatives: `select: false` at the schema level, or an explicit `transform`.
+- **New example: `06-typescript-mongoose`**: A full TypeScript example — typed Mongoose model, inferred `transform` generics, the `res.*` module augmentation in action — verified to type-check clean against the shipped `.d.ts`.
+- **Release pipeline fixed**: `publish.yml`'s version-bump detection matched literal `major:`/`minor:` strings that never occurred under this project's actual `feat:`/`fix:`/etc. commit convention, so every release could only ever compute a patch bump regardless of content. Now maps `feat:` → minor, a `!:`/`BREAKING CHANGE` marker → major, everything else → patch. `test.yml` also now runs on pushes to `dev` (previously only `main`), so the branch PRs are actually opened against gets CI signal before merging.
+- **114 tests** (up from 42): pagination features (`skipCount`, `useEstimatedCount`, `lean+populate` guard, cursor `asc`/`desc` direction, `hasNextPage` detection, `Date` cursor serialization, `allowDiskUse`, count pipeline `$limit`/`$skip` stripping, `MongooseDuplicateKeyError` value exposure, `routeNotFound` behavior), `nonPaginatedMaxItems` enforcement, `createAppError` string/object-throw branches, `paginateAggregate` `skipCount` end-to-end, the dev-mode setup diagnostic, and the `transform` `index` parameter / pinpointed error messages.
 
 ## [1.1.3] - May 31, 2026
 
