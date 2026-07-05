@@ -43,11 +43,42 @@ describe("Error Adapter Safety", () => {
   it("should ignore adapters that return non-AppError values", () => {
     // Adapter returns a string instead of an AppError instance (invalid)
     const invalidAdapter = () => "not an app error" as any;
-    
+
     const result = createAppError(new Error("Test"), [invalidAdapter]);
 
     // Should ignore the string and use the internal logic to wrap the Error
     expect(result).toBeInstanceOf(AppError);
     expect(result.message).toBe("Test");
+  });
+});
+
+describe("createAppError — non-Error throws", () => {
+  it("maps a bare string throw to an operational 500 AppError with the string as the message", () => {
+    const result = createAppError("Unauthorized");
+
+    expect(result).toBeInstanceOf(AppError);
+    expect(result.message).toBe("Unauthorized");
+    expect(result.statusCode).toBe(500);
+    expect(result.code).toBe("INTERNAL_ERROR");
+    expect(result.isOperational).toBe(true);
+  });
+
+  it("maps a plain object with a message property to an operational 500 AppError", () => {
+    const result = createAppError({ message: "custom failure", extra: "ignored" });
+
+    expect(result).toBeInstanceOf(AppError);
+    expect(result.message).toBe("custom failure");
+    expect(result.statusCode).toBe(500);
+    expect(result.code).toBe("INTERNAL_ERROR");
+    expect(result.isOperational).toBe(true);
+  });
+
+  it("falls back to a generic non-operational 500 AppError for a value with no usable message", () => {
+    const result = createAppError({ notAMessage: true });
+
+    expect(result).toBeInstanceOf(AppError);
+    expect(result.message).toBe("Internal server error");
+    expect(result.statusCode).toBe(500);
+    expect(result.isOperational).toBe(false);
   });
 });

@@ -29,6 +29,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.post(
         "/user",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulating a Mongoose pre-hook validation failure
           // This would normally come from a schema.pre('validate', ...) hook
@@ -81,6 +82,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.post(
         "/validate",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulating Joi validation error
           const error = new Error("Validation failed");
@@ -128,6 +130,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.get(
         "/protected",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulate JWT token expiration
           const error = new Error("jwt expired");
@@ -176,6 +179,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.get(
         "/protected",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulate JWT invalid token
           const error = new Error("invalid signature");
@@ -218,6 +222,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.get(
         "/users/:id",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // This would be a real ReferenceError thrown by user code
           const error = new Error("user is not defined");
@@ -263,6 +268,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.post(
         "/process",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulating TypeError: Cannot read property 'name' of undefined
           const error = new Error("Cannot read property 'name' of undefined");
@@ -308,6 +314,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.post(
         "/custom-validate",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Custom validation error thrown from user code
           const details = [
@@ -359,6 +366,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.get(
         "/users",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Simulate async mongoose error
           const error = new Error("connect ECONNREFUSED 127.0.0.1:27017");
@@ -407,6 +415,7 @@ describe("Real-World Error Scenarios with Stack Traces", () => {
 
       app.get(
         "/error",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         asyncHandler(async (req: Request, res: Response) => {
           // Edge case: error only from framework (shouldn't happen but handled)
           const error = new Error("Framework error");

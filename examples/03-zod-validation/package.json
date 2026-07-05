@@ -1,0 +1,15 @@
+{
+  "name": "03-zod-validation",
+  "version": "1.0.0",
+  "description": "Zod schema validation — ZodError auto-mapped to field-level 400 VALIDATION_ERROR",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^5.0.0",
+    "express-unified-response": "^1.1.2",
+    "zod": "^3.22.0"
+  }
+}

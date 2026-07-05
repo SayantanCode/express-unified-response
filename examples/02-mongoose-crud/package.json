@@ -1,0 +1,16 @@
+{
+  "name": "02-mongoose-crud",
+  "version": "1.0.0",
+  "description": "CRUD + offset / cursor / aggregate pagination with Mongoose — error auto-detection included",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^5.0.0",
+    "express-unified-response": "^1.1.2",
+    "mongoose": "^9.0.0"
+  }
+}

@@ -15,6 +15,13 @@ export default defineConfig(
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-floating-promises": "error",
+      // Underscore-prefixed names signal intentionally unused params/vars (e.g. _req, _res)
+      "@typescript-eslint/no-unused-vars": ["error", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
     },
   },
   {
@@ -24,6 +31,6 @@ export default defineConfig(
   },
   {
     // Global ignores must be in their own object
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["dist/**", "node_modules/**", "examples/**"],
   }
 );

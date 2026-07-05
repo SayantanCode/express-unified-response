@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+coverage/
 
 # Ignore example for now
 example/

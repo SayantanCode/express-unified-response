@@ -1,0 +1,24 @@
+{
+  "name": "06-typescript-mongoose",
+  "version": "1.0.0",
+  "description": "Full TypeScript example — typed Mongoose models, inferred transform generics, and the res.* module augmentation in action",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^5.0.0",
+    "express-unified-response": "^1.1.2",
+    "mongoose": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

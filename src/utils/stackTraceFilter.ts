@@ -21,16 +21,13 @@ export function filterStackTrace(stack: string | undefined): string | undefined 
       continue;
     }
 
-    // Filter out node_modules and node internal frames
-    if (line.includes('node_modules') || line.includes('node:internal')) {
+    // Filter node_modules and all Node.js built-in ESM URLs (node:internal, node:async_hooks, node:events, etc.)
+    if (line.includes('node_modules') || line.includes('node:')) {
       continue;
     }
 
-    // Filter out built-in Node.js modules (vitest, express, etc internal frames)
-    if (
-      line.includes('(internal/') ||
-      line.includes('at async') && (line.includes('vitest') || line.includes('node_modules'))
-    ) {
+    // Filter legacy internal paths (older Node.js without node: prefix)
+    if (line.includes('(internal/')) {
       continue;
     }
 

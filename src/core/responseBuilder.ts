@@ -3,7 +3,7 @@
 import { resolveConfig } from "../config/responseConfig";
 import { ResolvedResponseConfig, ResponseConfig } from "../config/types";
 import { AppError, createAppError } from "./errors";
-import { PaginatedResult } from "./types";
+import { PaginatedResult, CursorPaginatedResult } from "./types";
 import { TransformFn } from "./paginator";
 import { ErrorAdapter } from "./types";
 import { filterStackTrace, safeStringify } from "../utils/stackTraceFilter";
@@ -21,19 +21,54 @@ export class ResponseBuilder {
 
   // ---------- Internal helpers ----------
 
-  /**
-   * Applies transformation to data or array of data
-   */
+  private unwrapDoc<T>(item: T): T {
+    if (item !== null && item !== undefined && typeof item === "object" && "_doc" in (item as any)) {
+      return (item as any)._doc;
+    }
+    return item;
+  }
+
   private applyTransform<T, R>(
     data: T | T[],
     transform?: TransformFn<T, R>,
   ): T | R | R[] {
-    if (transform) {
-      return Array.isArray(data)
-        ? (data.map((item) => transform(item)) as any)
-        : transform(data);
+    // Nothing to process — return as-is so baseSuccess can decide what to do with null/undefined
+    if (data === null || data === undefined) return data as any;
+
+    if (Array.isArray(data)) {
+      // Unwrap _doc on every item (handles arrays of Mongoose documents)
+      const unwrapped = data.map((item) => this.unwrapDoc(item));
+      if (!transform) return unwrapped as any;
+
+      // Caught per-item (not around the whole .map()) so a failure on one item
+      // reports exactly which index — and its _id/id if present — caused it,
+      // instead of a generic message with no way to tell which item broke.
+      return unwrapped.map((item, index) => {
+        try {
+          return transform(item, index);
+        } catch (err) {
+          const id = (item as any)?._id ?? (item as any)?.id;
+          const idSuffix = id !== undefined ? `, id: ${String(id)}` : "";
+          throw new AppError(
+            `Transform function threw at index ${index}${idSuffix}: ${err instanceof Error ? err.message : String(err)}`,
+            500,
+            "TRANSFORM_ERROR"
+          );
+        }
+      }) as R[];
     }
-    return data as T | R | R[];
+
+    const unwrapped = this.unwrapDoc(data);
+    if (!transform) return unwrapped as any;
+    try {
+      return transform(unwrapped, 0);
+    } catch (err) {
+      throw new AppError(
+        `Transform function threw: ${err instanceof Error ? err.message : String(err)}`,
+        500,
+        "TRANSFORM_ERROR"
+      );
+    }
   }
 
   private baseSuccess<T>(data: T, message?: string) {
@@ -54,10 +89,10 @@ export class ResponseBuilder {
   // ---------- Public success APIs ----------
 
   /**
-   * List response designed to work with Paginator.paginateList results.
-   * Handles the metadata block and transformation.
+   * Shared by list() and paginated() — both return the identical offset-pagination
+   * envelope (docs + meta block), just sourced from different pagination strategies.
    */
-  list<T, R = T>(
+  private buildOffsetPaginatedResponse<T, R = T>(
     result: PaginatedResult<T>,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean },
@@ -66,11 +101,8 @@ export class ResponseBuilder {
 
     const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
     const labels = this.config.pagination.labels || {};
-
-    // 1. Transform the data within the result object
     const finalDocs = this.applyTransform(result.docs, transform);
 
-    // 2. Map the metadata using your configured labels
     const meta = {
       [labels.totalDocs ?? "totalDocs"]: result.totalDocs,
       [labels.limit ?? "limit"]: result.limit,
@@ -93,6 +125,18 @@ export class ResponseBuilder {
       shouldLog: this.shouldLog({ silent }),
     };
   }
+
+  /**
+   * List response designed to work with Paginator.paginateList results.
+   * Handles the metadata block and transformation.
+   */
+  list<T, R = T>(
+    result: PaginatedResult<T>,
+    message?: string,
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
+    return this.buildOffsetPaginatedResponse(result, message, options);
+  }
   /**
    * Generic success (200) with transformation support.
    */
@@ -102,15 +146,28 @@ export class ResponseBuilder {
     options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
-    let processedData = data;
-    if (typeof data === "object" && data !== null && "_doc" in (data as any)) {
-      processedData = (data as any)._doc;
-    }
-
-    const finalData = this.applyTransform(processedData, transform);
+    const finalData = this.applyTransform(data, transform);
 
     return {
       statusCode: 200,
+      body: this.baseSuccess(finalData, message),
+      shouldLog: this.shouldLog({ silent }),
+    };
+  }
+
+  /**
+   * Accepted (202) — async operations queued for processing.
+   */
+  accepted<T, R = T>(
+    data?: T,
+    message?: string,
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
+    const { transform, silent } = options || {};
+    const finalData = this.applyTransform(data as T, transform);
+
+    return {
+      statusCode: 202,
       body: this.baseSuccess(finalData, message),
       shouldLog: this.shouldLog({ silent }),
     };
@@ -147,15 +204,7 @@ export class ResponseBuilder {
   ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
     const { transform, silent } = options || {};
 
-    const isEmpty = (val: any) =>
-      val === undefined ||
-      val === null ||
-      val === "" ||
-      val === false ||
-      val === "_";
-
-    // Scenario A: User wants a 200 response (Either they have data OR a message)
-    const hasData = !isEmpty(data);
+    const hasData = data !== undefined && data !== null;
     const hasMessage = !!message;
 
     if (hasData || hasMessage) {
@@ -170,11 +219,33 @@ export class ResponseBuilder {
       };
     }
 
-    // Scenario B: No data and No message -> 204 No Content
+    // When no data/message: respect updateReturnsBody config
+    const returnsBody = this.config.restDefaults.updateReturnsBody;
+    if (returnsBody) {
+      return {
+        statusCode: 200,
+        body: this.baseSuccess(undefined, undefined),
+        shouldLog: this.shouldLog({ silent }),
+      };
+    }
+
     return {
       statusCode: 204,
       body: undefined,
       shouldLog: this.shouldLog({ silent }),
+    };
+  }
+
+  /**
+   * Explicit 204 No Content — for endpoints that are not delete operations
+   * but genuinely have no response body (e.g. PATCH, action endpoints, HEAD).
+   */
+  noContent(
+    options?: { silent?: boolean },
+  ): { statusCode: number; shouldLog: boolean } {
+    return {
+      statusCode: 204,
+      shouldLog: this.shouldLog(options),
     };
   }
 
@@ -184,36 +255,39 @@ export class ResponseBuilder {
    * - Else -> 200 + { success, message? }.
    * - Overrides 204 to 200 if message/data is provided.
    */
-  deleted(
-    data?: any,
+  deleted<T, R = T>(
+    data?: T,
     message?: string,
-    options?: { silent?: boolean },
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body?: Record<string, any>; shouldLog: boolean } {
-    const { silent } = options || {};
+    const { silent, transform } = options || {};
 
-    const isEmpty = (val: any) =>
-      val === undefined ||
-      val === null ||
-      val === "" ||
-      val === false ||
-      val === "_";
-
-    const hasData = !isEmpty(data);
+    const hasData = data !== undefined && data !== null;
     const hasMessage = !!message;
 
-    // If global config says 204 but we have a message, we MUST override to 200
+    // Explicit data/message always forces 200 with body
     if (hasMessage || hasData) {
+      const finalData = hasData ? this.applyTransform(data!, transform) : undefined;
       return {
         statusCode: 200,
-        body: this.baseSuccess(hasData ? data : undefined, message),
+        body: this.baseSuccess(finalData, message),
         shouldLog: this.shouldLog({ silent }),
       };
     }
 
-    // Default to 204 for deletions if no message/data provided
+    // When no data/message: respect deleteReturnsNoContent config
+    const noContent = this.config.restDefaults.deleteReturnsNoContent;
+    if (noContent) {
+      return {
+        statusCode: 204,
+        body: undefined,
+        shouldLog: this.shouldLog({ silent }),
+      };
+    }
+
     return {
-      statusCode: 204,
-      body: undefined,
+      statusCode: 200,
+      body: this.baseSuccess(undefined, undefined),
       shouldLog: this.shouldLog({ silent }),
     };
   }
@@ -226,31 +300,38 @@ export class ResponseBuilder {
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
-    const { transform, silent } = options || {};
+    return this.buildOffsetPaginatedResponse(result, message, options);
+  }
 
+  /**
+   * Cursor-paginated response (200) — no total count, uses nextCursor for navigation.
+   */
+  cursorPaginated<T, R = T>(
+    result: CursorPaginatedResult<T>,
+    message?: string,
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
+    const { transform, silent } = options || {};
     const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
-    const labels = this.config.pagination.labels || {};
+
     const finalDocs = this.applyTransform(result.docs, transform);
 
     const meta = {
-      [labels.totalDocs ?? "totalDocs"]: result.totalDocs,
-      [labels.limit ?? "limit"]: result.limit,
-      [labels.page ?? "page"]: result.page,
-      [labels.totalPages ?? "totalPages"]: result.totalPages,
-      [labels.hasNextPage ?? "hasNextPage"]: result.hasNextPage,
-      [labels.hasPrevPage ?? "hasPrevPage"]: result.hasPrevPage,
-      [labels.nextPage ?? "nextPage"]: result.nextPage,
-      [labels.prevPage ?? "prevPage"]: result.prevPage,
+      nextCursor: result.nextCursor,
+      hasNextPage: result.hasNextPage,
+      limit: result.limit,
     };
 
-    const body = {
-      [successKey]: true,
-      [dataKey]: finalDocs,
-      [metaKey]: meta,
-      ...(message ? { [messageKey]: message } : {}),
+    return {
+      statusCode: 200,
+      body: {
+        [successKey]: true,
+        [dataKey]: finalDocs,
+        [metaKey]: meta,
+        ...(message ? { [messageKey]: message } : {}),
+      },
+      shouldLog: this.shouldLog({ silent }),
     };
-
-    return { statusCode: 200, body, shouldLog: this.shouldLog({ silent }) };
   }
 
   /**
@@ -269,7 +350,7 @@ export class ResponseBuilder {
     // Merge adapters: Method-level adapters come first, then global config adapters
     const globalAdapters = this.config.adapters || [];
     const combinedAdapters = [...(methodAdapters || []), ...globalAdapters];
-    const appErr: AppError = createAppError(err, combinedAdapters);
+    const appErr: AppError = createAppError(err, combinedAdapters, this.config.logger?.onWarn);
     const { keys, error } = this.config;
     const { errorKey, messageKey, successKey } = keys;
 

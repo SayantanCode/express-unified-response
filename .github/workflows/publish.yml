@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.ADMIN_GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -57,9 +58,11 @@ jobs:
             COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=%B)
           fi
 
-          if echo "$COMMITS" | grep -qiE "major:"; then
+          # Matches the commit convention from CONTRIBUTING.md (feat:/fix:/docs:/refactor:/test:/chore:)
+          # feat: -> minor, a "!" breaking marker or "BREAKING CHANGE" footer -> major, anything else -> patch
+          if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^(feat|fix)(\([^)]*\))?!:"; then
             BUMP_TYPE="major"
-          elif echo "$COMMITS" | grep -qiE "minor:"; then
+          elif echo "$COMMITS" | grep -qiE "^feat(\([^)]*\))?:"; then
             BUMP_TYPE="minor"
           fi
 

@@ -17,7 +17,6 @@ export interface ErrorExposureConfig {
 
 
 export interface PaginationLabelMapping {
-  docs?: string; 
   totalDocs?: string;
   limit?: string;
   page?: string;
@@ -53,8 +52,21 @@ export interface ResponseConfig {
   };
   restDefaults?: RestDefaults;
   logger?: {
+    /**
+     * Controls which requests are logged.
+     * - "all"   (default) — log every request
+     * - "error" — log only 4xx/5xx responses; suppress 2xx/3xx success lines
+     * - "none"  — disable all request logging (overrides onSuccess/onError)
+     */
+    logLevel?: "all" | "error" | "none";
     onSuccess?: (req?: any, statusCode?: number, durationMs?: number) => void;
     onError?: (req?: any, error?: AppError, statusCode?: number, durationMs?: number) => void;
+    /**
+     * Called for internal package warnings (e.g. useEstimatedCount + filter conflict,
+     * adapter crash). Route to your own logger to keep all output in one place.
+     * Receives the message and, for adapter crashes, the original error as context.
+     */
+    onWarn?: (message: string, context?: unknown) => void;
   };
   routeNotFound?: boolean;
   silent?: boolean;
@@ -70,8 +82,10 @@ export interface ResolvedResponseConfig {
   };
   restDefaults: Required<RestDefaults>;
   logger?: {
+    logLevel?: "all" | "error" | "none";
     onSuccess?: (req?: any, statusCode?: number, durationMs?: number) => void;
     onError?: (req?: any, error?: AppError, statusCode?: number, durationMs?: number) => void;
+    onWarn?: (message: string, context?: unknown) => void;
   };
   routeNotFound?: boolean;
   silent?: boolean;
