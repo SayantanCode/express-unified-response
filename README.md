@@ -462,12 +462,12 @@ res.success(user, "Found", {
 });
 ```
 
-**Array of documents** — transform is called once per item, each item is `_doc`-unwrapped individually:
+**Array of documents** — transform is called once per item, each item is `_doc`-unwrapped individually. The second argument is the item's index in the array (always `0` for single-object calls like `res.success`) — existing single-argument transform functions keep working unchanged:
 
 ```js
 res.success(await User.find(), "Found", {
-  transform: (u) => ({ id: u._id, name: u.name })
-  // called for each user in the array
+  transform: (u, i) => ({ position: i, id: u._id, name: u.name })
+  // called once per user in the array, i = 0, 1, 2, ...
 });
 ```
 
@@ -499,7 +499,9 @@ res.success(user, "Found", {
 });
 ```
 
-Populated nested documents (like `u.posts`) are not individually `_doc`-unwrapped by the middleware, but Mongoose's own `toJSON` handles their serialization correctly if you don't transform them.
+Populated nested documents (like `u.posts`) are not individually `_doc`-unwrapped by the middleware, but Mongoose's own `toJSON` handles their serialization correctly if you don't transform them — because they're left as real Mongoose Document instances, and `JSON.stringify` calls `.toJSON()` on any nested value that has one.
+
+The *top-level* document you pass in doesn't get this benefit: it's unwrapped to plain `_doc` **before** `JSON.stringify` ever runs, so by the time serialization happens it's already a plain object with no `.toJSON()` to call. This is why a schema-level `toJSON` transform on the top-level document never runs through this package — see [Common Mistake #9](#-common-mistakes) below.
 
 ### If transform throws
 
@@ -510,6 +512,15 @@ res.success(user, "OK", {
   transform: (u) => u.nonExistent.deeply.nested  // throws TypeError
   // Client gets: 500 { success: false, message: "Transform function threw: ..." }
 });
+```
+
+For arrays, each item is transformed independently — a throw on one item doesn't affect the others' *processing*, but since the whole response fails as one `TRANSFORM_ERROR`, the error message tells you exactly which item broke (its index, and `_id`/`id` if present), so you're not left guessing which of N items in a large or deeply nested array caused it:
+
+```js
+res.list(users, {
+  transform: (u) => ({ id: u._id, postCount: u.posts.length }) // throws if u.posts is null
+});
+// Client gets: 500 { message: "Transform function threw at index 42, id: 664f...: Cannot read properties of null (reading 'length')" }
 ```
 
 ### Transform is for output shaping only
@@ -1114,6 +1125,32 @@ await res.paginateCursor(PostModel, { cursor: req.query.cursor });
 // First request: omit cursor or pass undefined
 // Subsequent requests: pass the nextCursor string from the previous response
 ```
+
+### 9. Relying on your schema's `toJSON` transform to hide sensitive fields
+
+```js
+// ❌ Wrong — schema.toJSON transform is silently bypassed
+schema.set("toJSON", { transform: (_doc, ret) => { delete ret.password; return ret; } });
+
+const user = await User.findById(req.params.id);
+res.success(user);
+// password leaks — res.success()/created()/updated()/deleted() unwrap Mongoose's
+// internal _doc directly for convenience, whether or not you pass a transform option.
+// That skips toJSON()/toObject() entirely, so schema-level transforms and virtuals
+// never run.
+
+// ✅ Correct — put sensitive fields behind select: false at the schema level
+const userSchema = new Schema({ password: { type: String, select: false } });
+// select: false means password is never fetched from the DB in the first place —
+// nothing in _doc to leak, regardless of any serialization path.
+
+// ✅ Also correct — shape the DTO explicitly with transform
+res.success(user, "Found", {
+  transform: (u) => ({ id: u._id, name: u.name, email: u.email }), // password intentionally omitted
+});
+```
+
+> Don't rely on a schema's `toJSON` transform (or virtuals) to hide/shape fields when passing a document straight to `res.success`/`created`/`updated`/`deleted`. Use `select: false` for anything sensitive, or shape the response explicitly with `transform`.
 
 ---
 

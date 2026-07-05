@@ -24,7 +24,13 @@ type PaginatorConfig = Required<PaginationDefaults> & {
   warn?: (message: string, context?: unknown) => void;
 };
 
-export type TransformFn<T, R> = (doc: T) => R;
+/**
+ * `index` is the item's position within the array being transformed (always `0`
+ * for single-object calls like `res.success`/`res.created`). Existing transform
+ * functions that only declare `(doc)` remain valid — extra callback arguments
+ * are always safely ignorable in JS/TS, same as `Array.prototype.map`.
+ */
+export type TransformFn<T, R> = (doc: T, index: number) => R;
 
 export interface QueryPaginationOptions<T extends Document> {
   paginate?: boolean;

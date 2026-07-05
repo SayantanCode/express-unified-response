@@ -1,6 +1,6 @@
 # Examples
 
-Five self-contained projects showing `express-unified-response` in real-world scenarios.
+Six self-contained projects showing `express-unified-response` in real-world scenarios.
 Each runs independently with `npm install && npm start`.
 
 ## Prerequisites
@@ -16,6 +16,7 @@ Each runs independently with `npm install && npm start`.
 | [03-zod-validation](./03-zod-validation) | Zod schema validation, `ZodError` auto-mapped to field-level 400 with details | — |
 | [04-jwt-auth](./04-jwt-auth) | JWT middleware, `TokenExpiredError` / `JsonWebTokenError` → 401 auto, role-based `ForbiddenError` | — |
 | [05-file-upload](./05-file-upload) | Multer disk upload (`index.js`), AWS S3 with custom error adapter (`s3.js`) | AWS creds for `s3.js` |
+| [06-typescript-mongoose](./06-typescript-mongoose) | Same CRUD/pagination story as `02`, written in TypeScript — typed models, inferred `transform` generics, the `res.*` module augmentation in action | MongoDB |
 
 ## Running any example
 

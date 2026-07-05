@@ -39,21 +39,29 @@ export class ResponseBuilder {
       // Unwrap _doc on every item (handles arrays of Mongoose documents)
       const unwrapped = data.map((item) => this.unwrapDoc(item));
       if (!transform) return unwrapped as any;
-      try {
-        return unwrapped.map((item) => transform(item)) as R[];
-      } catch (err) {
-        throw new AppError(
-          `Transform function threw: ${err instanceof Error ? err.message : String(err)}`,
-          500,
-          "TRANSFORM_ERROR"
-        );
-      }
+
+      // Caught per-item (not around the whole .map()) so a failure on one item
+      // reports exactly which index — and its _id/id if present — caused it,
+      // instead of a generic message with no way to tell which item broke.
+      return unwrapped.map((item, index) => {
+        try {
+          return transform(item, index);
+        } catch (err) {
+          const id = (item as any)?._id ?? (item as any)?.id;
+          const idSuffix = id !== undefined ? `, id: ${String(id)}` : "";
+          throw new AppError(
+            `Transform function threw at index ${index}${idSuffix}: ${err instanceof Error ? err.message : String(err)}`,
+            500,
+            "TRANSFORM_ERROR"
+          );
+        }
+      }) as R[];
     }
 
     const unwrapped = this.unwrapDoc(data);
     if (!transform) return unwrapped as any;
     try {
-      return transform(unwrapped);
+      return transform(unwrapped, 0);
     } catch (err) {
       throw new AppError(
         `Transform function threw: ${err instanceof Error ? err.message : String(err)}`,

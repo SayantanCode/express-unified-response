@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import express from "express";
 import request from "supertest";
-import { createResponseMiddleware } from "../src/index";
+import { createResponseMiddleware, createErrorMiddleware } from "../src/index";
 import { Paginator } from "../src/core/paginator";
 
 describe("Data Transformation (DTO)", () => {
@@ -87,5 +87,96 @@ describe("Data Transformation (DTO)", () => {
     const res = await request(app).get("/aggregate-transform");
     expect(res.body.data[0]).toEqual({ id: "123", doubleVal: 20 });
     expect(res.body.data[1].doubleVal).toBe(40);
+  });
+});
+
+describe("Transform — index parameter", () => {
+  const app = express();
+  app.use(createResponseMiddleware());
+
+  it("passes the item's index as the second argument for array transforms", async () => {
+    app.get("/list-index", async (_req, res) => {
+      await res.list(
+        [{ name: "Joe" }, { name: "Jane" }, { name: "Alex" }],
+        { paginate: false, transform: (doc: any, i: number) => ({ position: i, name: doc.name }) }
+      );
+    });
+
+    const res = await request(app).get("/list-index");
+    expect(res.body.data).toEqual([
+      { position: 0, name: "Joe" },
+      { position: 1, name: "Jane" },
+      { position: 2, name: "Alex" },
+    ]);
+  });
+
+  it("passes index 0 for single-object transforms (res.success)", async () => {
+    app.get("/single-index", (_req, res) => {
+      res.success({ name: "Joe" }, "OK", {
+        transform: (doc: any, i: number) => ({ index: i, name: doc.name }),
+      });
+    });
+
+    const res = await request(app).get("/single-index");
+    expect(res.body.data).toEqual({ index: 0, name: "Joe" });
+  });
+
+  it("existing single-argument transform functions still work unchanged", async () => {
+    app.get("/legacy-transform", async (_req, res) => {
+      await res.list(
+        [{ _id: 1, name: "Joe" }],
+        { paginate: false, transform: (doc: any) => ({ id: doc._id, name: doc.name }) }
+      );
+    });
+
+    const res = await request(app).get("/legacy-transform");
+    expect(res.body.data).toEqual([{ id: 1, name: "Joe" }]);
+  });
+});
+
+describe("Transform errors — pinpoint the failing item", () => {
+  const app = express();
+  app.use(createResponseMiddleware());
+
+  // Routes registered before createErrorMiddleware() — same rule the package's
+  // own dev-mode diagnostic (createErrorMiddleware) checks for.
+  app.get("/broken-transform", async (_req, res) => {
+    await res.list(
+      [
+        { _id: "a1", name: "Joe", posts: [] },
+        { _id: "a2", name: "Jane", posts: [{ title: "Hi" }] },
+        { _id: "a3", name: "Alex", posts: null }, // this one will throw
+      ],
+      {
+        paginate: false,
+        // Deliberately breaks only on the item with no `posts` array —
+        // simulates the "nested structure transform" failure scenario.
+        transform: (doc: any) => ({ id: doc._id, postCount: doc.posts.length }),
+      }
+    );
+  });
+
+  app.get("/broken-transform-no-id", async (_req, res) => {
+    await res.list(
+      [{ value: 1 }, { value: null }],
+      { paginate: false, transform: (doc: any) => ({ doubled: doc.value.toFixed(2) }) }
+    );
+  });
+
+  app.use(createErrorMiddleware());
+
+  it("includes the failing item's index and _id in the error message", async () => {
+    const res = await request(app).get("/broken-transform");
+    expect(res.status).toBe(500);
+    expect(res.body.error.code).toBe("TRANSFORM_ERROR");
+    expect(res.body.message).toMatch(/index 2/);
+    expect(res.body.message).toMatch(/id: a3/);
+  });
+
+  it("does not include an id suffix when the item has no _id/id field", async () => {
+    const res = await request(app).get("/broken-transform-no-id");
+    expect(res.status).toBe(500);
+    expect(res.body.message).toMatch(/index 1/);
+    expect(res.body.message).not.toMatch(/id:/);
   });
 });
