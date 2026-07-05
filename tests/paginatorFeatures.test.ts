@@ -469,3 +469,52 @@ describe('createErrorMiddleware — routeNotFound', () => {
     expect(res.body.custom).toBe(true); // our custom handler ran, not the package's
   });
 });
+
+// ─── res.list() — nonPaginatedMaxItems DoS protection ───────────────────────
+
+describe('res.list() — nonPaginatedMaxItems enforcement', () => {
+  it('caps a non-paginated list at the default 1000 items', async () => {
+    const app = express();
+    app.use(createResponseMiddleware());
+
+    const hugeArray = Array.from({ length: 5000 }, (_, i) => ({ id: i }));
+    app.get('/huge', async (_req, res) => {
+      await res.list(hugeArray, { paginate: false });
+    });
+
+    const res = await request(app).get('/huge');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1000);
+    // totalDocs reflects the true size of the source array, only the payload is capped
+    expect(res.body.meta.totalDocs).toBe(5000);
+  });
+
+  it('respects a custom nonPaginatedMaxItems value from config', async () => {
+    const app = express();
+    app.use(createResponseMiddleware({ restDefaults: { nonPaginatedMaxItems: 25 } }));
+
+    const items = Array.from({ length: 200 }, (_, i) => ({ id: i }));
+    app.get('/capped', async (_req, res) => {
+      await res.list(items, { paginate: false });
+    });
+
+    const res = await request(app).get('/capped');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(25);
+  });
+
+  it('does not cap when paginate: true — normal page slicing applies instead', async () => {
+    const app = express();
+    app.use(createResponseMiddleware());
+
+    const items = Array.from({ length: 5000 }, (_, i) => ({ id: i }));
+    app.get('/paged', async (_req, res) => {
+      await res.list(items, { paginate: true, page: 1, limit: 10 });
+    });
+
+    const res = await request(app).get('/paged');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(10);
+    expect(res.body.meta.totalDocs).toBe(5000);
+  });
+});

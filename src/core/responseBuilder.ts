@@ -81,10 +81,10 @@ export class ResponseBuilder {
   // ---------- Public success APIs ----------
 
   /**
-   * List response designed to work with Paginator.paginateList results.
-   * Handles the metadata block and transformation.
+   * Shared by list() and paginated() — both return the identical offset-pagination
+   * envelope (docs + meta block), just sourced from different pagination strategies.
    */
-  list<T, R = T>(
+  private buildOffsetPaginatedResponse<T, R = T>(
     result: PaginatedResult<T>,
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean },
@@ -93,11 +93,8 @@ export class ResponseBuilder {
 
     const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
     const labels = this.config.pagination.labels || {};
-
-    // 1. Transform the data within the result object
     const finalDocs = this.applyTransform(result.docs, transform);
 
-    // 2. Map the metadata using your configured labels
     const meta = {
       [labels.totalDocs ?? "totalDocs"]: result.totalDocs,
       [labels.limit ?? "limit"]: result.limit,
@@ -119,6 +116,18 @@ export class ResponseBuilder {
       },
       shouldLog: this.shouldLog({ silent }),
     };
+  }
+
+  /**
+   * List response designed to work with Paginator.paginateList results.
+   * Handles the metadata block and transformation.
+   */
+  list<T, R = T>(
+    result: PaginatedResult<T>,
+    message?: string,
+    options?: { transform?: TransformFn<T, R>; silent?: boolean },
+  ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
+    return this.buildOffsetPaginatedResponse(result, message, options);
   }
   /**
    * Generic success (200) with transformation support.
@@ -283,31 +292,7 @@ export class ResponseBuilder {
     message?: string,
     options?: { transform?: TransformFn<T, R>; silent?: boolean },
   ): { statusCode: number; body: Record<string, any>; shouldLog: boolean } {
-    const { transform, silent } = options || {};
-
-    const { successKey, dataKey, metaKey, messageKey } = this.config.keys;
-    const labels = this.config.pagination.labels || {};
-    const finalDocs = this.applyTransform(result.docs, transform);
-
-    const meta = {
-      [labels.totalDocs ?? "totalDocs"]: result.totalDocs,
-      [labels.limit ?? "limit"]: result.limit,
-      [labels.page ?? "page"]: result.page,
-      [labels.totalPages ?? "totalPages"]: result.totalPages,
-      [labels.hasNextPage ?? "hasNextPage"]: result.hasNextPage,
-      [labels.hasPrevPage ?? "hasPrevPage"]: result.hasPrevPage,
-      [labels.nextPage ?? "nextPage"]: result.nextPage,
-      [labels.prevPage ?? "prevPage"]: result.prevPage,
-    };
-
-    const body = {
-      [successKey]: true,
-      [dataKey]: finalDocs,
-      [metaKey]: meta,
-      ...(message ? { [messageKey]: message } : {}),
-    };
-
-    return { statusCode: 200, body, shouldLog: this.shouldLog({ silent }) };
+    return this.buildOffsetPaginatedResponse(result, message, options);
   }
 
   /**

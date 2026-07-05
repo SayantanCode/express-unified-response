@@ -1,5 +1,5 @@
 // src/index.ts
-import "./express/types";
+import type {} from "./express/types";
 
 export type {
   ResponseOptions,

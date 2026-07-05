@@ -46,6 +46,10 @@
     "type": "git",
     "url": "git+https://github.com/SayantanCode/express-unified-response.git"
   },
+  "homepage": "https://github.com/SayantanCode/express-unified-response#readme",
+  "bugs": {
+    "url": "https://github.com/SayantanCode/express-unified-response/issues"
+  },
   "author": "Sayantan Chakraborty",
   "license": "MIT",
   "peerDependencies": {

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 import { Paginator } from '../src/core/paginator';
+import { createResponseMiddleware, createErrorMiddleware } from '../src/index';
 
 describe('Paginator.paginateAggregate', () => {
   const defaults = { page: 1, limit: 10, maxLimit: 100 };
@@ -42,5 +45,44 @@ describe('Paginator.paginateAggregate', () => {
     expect(dataPipeline).toContainEqual({ $limit: 5 });
     expect(result.totalDocs).toBe(50);
     expect(result.docs[0].name).toBe('Aggregated Item');
+  });
+});
+
+describe('res.paginateAggregate — skipCount end-to-end', () => {
+  it('skips the count pipeline entirely and returns totalDocs: -1 through a real Express route', async () => {
+    let countPipelineCalls = 0;
+
+    const mockModel: any = {
+      aggregate: vi.fn().mockImplementation((pipeline: any[]) => ({
+        exec: vi.fn().mockImplementation(async () => {
+          if (pipeline.some((p) => p.$count)) {
+            countPipelineCalls++;
+            return [{ totalDocs: 999 }];
+          }
+          return [{ _id: 1, name: 'Only Data Pipeline Ran' }];
+        }),
+      })),
+    };
+
+    const app = express();
+    app.use(createResponseMiddleware());
+
+    app.get('/stats', async (_req, res) => {
+      await res.paginateAggregate(
+        mockModel,
+        { pipeline: [{ $match: { active: true } }], skipCount: true },
+        'Stats fetched'
+      );
+    });
+
+    app.use(createErrorMiddleware());
+
+    const res = await request(app).get('/stats');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toEqual({ _id: 1, name: 'Only Data Pipeline Ran' });
+    expect(res.body.meta.totalDocs).toBe(-1);
+    // The count pipeline (containing $count) must never have been executed
+    expect(countPipelineCalls).toBe(0);
   });
 });
